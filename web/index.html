@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>캠퍼스맵 - 학생 참여형 캠퍼스 생활 정보 지도</title>
+  <link rel="stylesheet" href="css/style.css" />
+
+  <!-- 앱(PWA) 설정: 휴대폰 홈 화면에 설치하면 앱처럼 실행 -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#03c75a" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="캠퍼스맵" />
+
+  <!--
+    ============================================================
+    [네이버 지도 API 연동 위치]
+    아래 주석을 해제하고 YOUR_CLIENT_ID 를 발급받은 키로 바꾸세요.
+    (NCP 콘솔 > AI·NAVER API > Application > Maps)
+    ============================================================
+  -->
+  <!--
+  <script type="text/javascript"
+    src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=YOUR_CLIENT_ID"></script>
+  -->
+</head>
+<body>
+  <!-- 상단 헤더 -->
+  <header class="topbar">
+    <button class="icon-btn" id="sidebarToggle" aria-label="사이드바 열기/닫기">☰</button>
+    <h1 class="logo">캠퍼스<span>맵</span></h1>
+    <div class="search">
+      <input id="searchInput" type="search" placeholder="건물, 편의시설, 분실물 검색 (예: 프린터, 편의점)" />
+      <button id="searchBtn">검색</button>
+    </div>
+    <button class="primary-btn" id="openReportBtn">+ 정보 제보</button>
+  </header>
+
+  <div class="layout">
+    <!-- 좌측 사이드바 -->
+    <aside class="sidebar" id="sidebar">
+      <nav class="tabs" role="tablist">
+        <button class="tab active" data-tab="facility">🏢 편의시설</button>
+        <button class="tab" data-tab="cafeteria">🍚 학식</button>
+        <button class="tab" data-tab="lost">🔎 분실물</button>
+        <button class="tab" data-tab="report">✍️ 제보</button>
+      </nav>
+
+      <!-- 편의시설 탭 -->
+      <section class="panel active" id="panel-facility">
+        <div class="chips" id="facilityFilters"></div>
+        <ul class="list" id="buildingList"></ul>
+      </section>
+
+      <!-- 학식 탭 -->
+      <section class="panel" id="panel-cafeteria">
+        <!-- 현재 위치 설정 -->
+        <div class="loc-bar">
+          <button class="primary-btn small" id="locateBtn">📍 내 위치</button>
+          <select id="baseBuilding">
+            <option value="">또는 지금 있는 건물 선택</option>
+          </select>
+        </div>
+        <p class="hint" id="locStatus">위치를 설정하면 식당까지 거리와 도보 시간을 보여드려요.</p>
+
+        <!-- 요일 / 끼니 선택 -->
+        <div class="chips" id="dayChips"></div>
+        <div class="chips" id="mealChips"></div>
+
+        <ul class="list" id="cafeteriaList"></ul>
+      </section>
+
+      <!-- 분실물 탭 -->
+      <section class="panel" id="panel-lost">
+        <div class="panel-actions">
+          <select id="lostFilter">
+            <option value="all">전체</option>
+            <option value="lost">잃어버렸어요</option>
+            <option value="found">주웠어요</option>
+          </select>
+          <button class="primary-btn small" id="openLostBtn">+ 분실물 등록</button>
+        </div>
+        <ul class="list" id="lostList"></ul>
+      </section>
+
+      <!-- 제보 탭 -->
+      <section class="panel" id="panel-report">
+        <p class="hint">잘못된 정보나 새로운 시설을 알려주세요. 학생들의 제보로 지도가 완성됩니다.</p>
+        <button class="primary-btn full" id="openReportBtn2">+ 새 제보 작성</button>
+        <ul class="list" id="reportList"></ul>
+      </section>
+    </aside>
+
+    <!-- 메인: 지도 영역 -->
+    <main class="map-wrap">
+      <!-- ★ 네이버 지도가 들어갈 컨테이너 (id 변경 금지: js/map.js 에서 사용) -->
+      <div id="map"></div>
+
+      <!-- 지도 위 상세정보 카드 -->
+      <div class="detail-card hidden" id="detailCard">
+        <button class="close" id="detailClose" aria-label="닫기">✕</button>
+        <div id="detailBody"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 챗봇 -->
+  <button class="chat-fab" id="chatFab" aria-label="챗봇 열기">💬</button>
+  <section class="chat hidden" id="chatPanel" aria-label="캠퍼스 챗봇">
+    <header class="chat-head">
+      <strong>🤖 캠퍼스 챗봇</strong>
+      <button class="close" id="chatClose" aria-label="닫기">✕</button>
+    </header>
+    <div class="chat-log" id="chatLog"></div>
+    <div class="chips chat-suggest" id="chatSuggest"></div>
+    <form class="chat-input" id="chatForm">
+      <input id="chatInput" placeholder="예: 오늘 점심 뭐야?" autocomplete="off" />
+      <button class="primary-btn">전송</button>
+    </form>
+  </section>
+
+  <!-- 모달: 분실물 등록 -->
+  <dialog id="lostModal">
+    <form method="dialog" id="lostForm">
+      <h2>분실물 등록</h2>
+      <label>구분
+        <select name="type" required>
+          <option value="lost">잃어버렸어요</option>
+          <option value="found">주웠어요</option>
+        </select>
+      </label>
+      <label>물건 이름 <input name="title" required placeholder="예: 검정색 에어팟 케이스" /></label>
+      <label>장소(건물) <select name="buildingId" class="building-select" required></select></label>
+      <label>상세 위치 <input name="place" placeholder="예: 3층 열람실 창가" /></label>
+      <label>설명 <textarea name="desc" rows="3"></textarea></label>
+      <label>연락처 <input name="contact" placeholder="오픈채팅 링크 등" /></label>
+      <div class="modal-actions">
+        <button value="cancel" formnovalidate>취소</button>
+        <button value="ok" class="primary-btn">등록</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 모달: 정보 제보 / 수정 -->
+  <dialog id="reportModal">
+    <form method="dialog" id="reportForm">
+      <h2>정보 제보 · 수정 요청</h2>
+      <label>유형
+        <select name="kind" required>
+          <option value="new">새 시설 추가</option>
+          <option value="edit">정보 수정</option>
+          <option value="menu">학식 정보</option>
+          <option value="etc">기타</option>
+        </select>
+      </label>
+      <label>건물 <select name="buildingId" class="building-select" required></select></label>
+      <label>층 <input name="floor" placeholder="예: 2F, B1" /></label>
+      <label>내용 <textarea name="content" rows="4" required placeholder="예: 2층 복도 끝에 정수기가 새로 생겼어요"></textarea></label>
+      <div class="modal-actions">
+        <button value="cancel" formnovalidate>취소</button>
+        <button value="ok" class="primary-btn">제출</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="js/data.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/chatbot.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    // 앱(PWA) 오프라인 지원 - http(s)/localhost 에서만 동작
+    if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    }
+  </script>
+</body>
+</html>

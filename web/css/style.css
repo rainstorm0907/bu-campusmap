@@ -1,0 +1,273 @@
+:root {
+  --primary: #03c75a;       /* 네이버 그린 계열 */
+  --primary-dark: #02a64b;
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --text: #1e2125;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --danger: #ef4444;
+  --topbar-h: 60px;
+  --sidebar-w: 360px;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  overflow: hidden;
+}
+button { font: inherit; cursor: pointer; }
+input, select, textarea { font: inherit; }
+
+/* ---------- 상단바 ---------- */
+.topbar {
+  height: var(--topbar-h);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  z-index: 20;
+}
+.logo { font-size: 20px; margin: 0; white-space: nowrap; }
+.logo span { color: var(--primary); }
+.search { flex: 1; display: flex; max-width: 560px; }
+.search input {
+  flex: 1; min-width: 0;
+  padding: 9px 12px;
+  border: 2px solid var(--primary);
+  border-right: none;
+  border-radius: var(--radius) 0 0 var(--radius);
+  outline: none;
+}
+.search button {
+  padding: 0 16px;
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+.icon-btn { border: none; background: none; font-size: 22px; padding: 4px 8px; }
+
+.primary-btn {
+  background: var(--primary); color: #fff;
+  border: none; border-radius: var(--radius);
+  padding: 9px 14px; white-space: nowrap;
+}
+.primary-btn:hover { background: var(--primary-dark); }
+.primary-btn.small { padding: 6px 10px; font-size: 13px; }
+.primary-btn.full { width: 100%; }
+
+/* ---------- 레이아웃 ---------- */
+.layout { display: flex; height: calc(100% - var(--topbar-h)); }
+
+.sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  transition: margin-left .25s;
+  z-index: 10;
+}
+.sidebar.collapsed { margin-left: calc(-1 * var(--sidebar-w)); }
+
+.tabs { display: flex; border-bottom: 1px solid var(--border); }
+.tab {
+  flex: 1; padding: 12px 4px;
+  border: none; background: none;
+  border-bottom: 3px solid transparent;
+  color: var(--muted); font-size: 14px;
+}
+.tab.active { color: var(--text); border-bottom-color: var(--primary); font-weight: 600; }
+
+.panel { display: none; flex: 1; overflow-y: auto; padding: 12px; }
+.panel.active { display: block; }
+.panel-actions { display: flex; gap: 8px; margin-bottom: 10px; }
+.panel-actions select { flex: 1; padding: 6px; border: 1px solid var(--border); border-radius: 8px; }
+.hint { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.chip {
+  padding: 5px 10px; font-size: 13px;
+  border: 1px solid var(--border); border-radius: 999px; background: #fff;
+}
+.chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.item {
+  padding: 12px; border: 1px solid var(--border); border-radius: var(--radius);
+  background: #fff; cursor: pointer;
+}
+.item:hover { border-color: var(--primary); }
+.item h3 { margin: 0 0 4px; font-size: 15px; }
+.item p { margin: 2px 0; font-size: 13px; color: var(--muted); }
+.badge {
+  display: inline-block; font-size: 11px; padding: 2px 6px; border-radius: 6px;
+  background: #e8f9ef; color: var(--primary-dark); margin-right: 4px;
+}
+.badge.lost { background: #fde8e8; color: var(--danger); }
+.badge.open { background: #e8f9ef; }
+.badge.closed { background: #eee; color: var(--muted); }
+.empty { text-align: center; color: var(--muted); padding: 24px 0; font-size: 14px; }
+
+/* ---------- 지도 영역 ---------- */
+.map-wrap { flex: 1; position: relative; }
+#map { width: 100%; height: 100%; }
+
+/* 네이버 지도 연동 전 표시되는 임시 지도 */
+.map-placeholder {
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(#dfe7df 1px, transparent 1px) 0 0 / 40px 40px,
+    linear-gradient(90deg, #dfe7df 1px, transparent 1px) 0 0 / 40px 40px,
+    #eef3ee;
+}
+.map-placeholder .notice {
+  position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+  background: rgba(30, 33, 37, .8); color: #fff;
+  padding: 8px 14px; border-radius: 999px; font-size: 13px; white-space: nowrap;
+}
+.mock-marker {
+  position: absolute; transform: translate(-50%, -100%);
+  background: var(--primary); color: #fff;
+  padding: 4px 8px; border-radius: 8px; font-size: 12px; white-space: nowrap;
+  border: none; box-shadow: 0 2px 6px rgba(0,0,0,.2);
+}
+.mock-marker::after {
+  content: ""; position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%);
+  border: 6px solid transparent; border-top-color: var(--primary); border-bottom: 0;
+}
+.mock-marker.selected { background: #ff6b00; z-index: 2; }
+.mock-marker.selected::after { border-top-color: #ff6b00; }
+
+/* 상세 카드 */
+.detail-card {
+  position: absolute; top: 16px; right: 16px;
+  width: 340px; max-height: calc(100% - 32px); overflow-y: auto;
+  background: var(--surface); border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.15);
+  padding: 18px; z-index: 5;
+}
+.detail-card.hidden { display: none; }
+.detail-card .close { position: absolute; top: 10px; right: 10px; border: none; background: none; font-size: 16px; }
+.detail-card h2 { margin: 0 0 6px; font-size: 18px; }
+.floor { border-top: 1px solid var(--border); padding: 8px 0; }
+.floor strong { display: inline-block; width: 40px; color: var(--primary-dark); }
+.menu-list { margin: 6px 0 0; padding-left: 18px; font-size: 14px; }
+
+/* ---------- 모달 ---------- */
+dialog {
+  border: none; border-radius: 14px; padding: 0; width: min(440px, 92vw);
+  box-shadow: 0 10px 40px rgba(0,0,0,.25);
+}
+dialog::backdrop { background: rgba(0,0,0,.4); }
+dialog form { padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+dialog h2 { margin: 0 0 4px; font-size: 18px; }
+dialog label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+dialog input, dialog select, dialog textarea {
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+}
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+.modal-actions button:not(.primary-btn) {
+  border: 1px solid var(--border); background: #fff; border-radius: var(--radius); padding: 9px 14px;
+}
+
+/* ---------- 모바일 ---------- */
+@media (max-width: 768px) {
+  .logo { display: none; }
+  #openReportBtn { display: none; }
+  .sidebar {
+    position: absolute; top: var(--topbar-h); bottom: 0; left: 0;
+    width: 100%; max-width: 100%;
+  }
+  .sidebar.collapsed { margin-left: -100%; }
+  .detail-card { left: 12px; right: 12px; top: auto; bottom: 12px; width: auto; max-height: 55%; }
+}
+
+/* ---------- 학식: 위치/거리 ---------- */
+.loc-bar { display: flex; gap: 8px; margin-bottom: 6px; }
+.loc-bar select { flex: 1; min-width: 0; padding: 6px; border: 1px solid var(--border); border-radius: 8px; }
+.dist { font-size: 13px; margin: 6px 0; color: var(--text); }
+.dist-bar { height: 6px; background: #eef0f2; border-radius: 99px; overflow: hidden; margin-bottom: 4px; }
+.dist-bar span { display: block; height: 100%; background: linear-gradient(90deg, var(--primary), #ff6b00); border-radius: 99px; }
+.menu-line { color: var(--text) !important; }
+
+/* 임시 지도: 내 위치 + 연결선 */
+.user-dot {
+  position: absolute; width: 18px; height: 18px; transform: translate(-50%, -50%);
+  background: #2f80ed; border: 3px solid #fff; border-radius: 50%;
+  box-shadow: 0 0 0 6px rgba(47,128,237,.25); z-index: 3;
+}
+.mock-lines { position: absolute; left: 50%; top: 50%; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+.mock-lines line { stroke: #ff6b00; stroke-width: 2.5; stroke-dasharray: 6 5; }
+.mock-lines text { font-size: 12px; font-weight: 600; fill: #b34a00; text-anchor: middle; paint-order: stroke; stroke: #fff; stroke-width: 4px; }
+
+/* ---------- 챗봇 ---------- */
+.chat-fab {
+  position: fixed; right: 20px; bottom: calc(20px + env(safe-area-inset-bottom));
+  width: 56px; height: 56px; border-radius: 50%; border: none;
+  background: var(--primary); color: #fff; font-size: 26px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.25); z-index: 30;
+}
+.chat {
+  position: fixed; right: 20px; bottom: calc(88px + env(safe-area-inset-bottom));
+  width: 360px; height: min(560px, calc(100vh - 140px));
+  background: var(--surface); border-radius: 16px; box-shadow: 0 12px 36px rgba(0,0,0,.25);
+  display: flex; flex-direction: column; overflow: hidden; z-index: 30;
+}
+.chat.hidden { display: none; }
+.chat-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--primary); color: #fff; }
+.chat-head .close { border: none; background: none; color: #fff; font-size: 16px; }
+.chat-log { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: var(--bg); }
+.msg { max-width: 85%; padding: 9px 12px; border-radius: 14px; font-size: 14px; line-height: 1.45; white-space: pre-line; }
+.msg.bot { background: #fff; border: 1px solid var(--border); align-self: flex-start; border-top-left-radius: 4px; }
+.msg.user { background: var(--primary); color: #fff; align-self: flex-end; border-top-right-radius: 4px; }
+.msg-link { display: block; margin-top: 8px; border: 1px solid var(--primary); color: var(--primary-dark); background: #fff; border-radius: 8px; padding: 5px 8px; font-size: 13px; }
+.chat-suggest { padding: 8px 12px 0; margin: 0; flex-wrap: nowrap; overflow-x: auto; }
+.chat-suggest .chip { white-space: nowrap; }
+.chat-input { display: flex; gap: 6px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }
+.chat-input input { flex: 1; min-width: 0; padding: 9px 12px; border: 1px solid var(--border); border-radius: 999px; outline: none; font-size: 16px; }
+
+/* ---------- 앱(설치형/iOS) 안전영역 ---------- */
+.topbar { padding-top: env(safe-area-inset-top); height: calc(var(--topbar-h) + env(safe-area-inset-top)); }
+.layout { height: calc(100% - var(--topbar-h) - env(safe-area-inset-top)); }
+
+@media (max-width: 768px) {
+  .sidebar { top: calc(var(--topbar-h) + env(safe-area-inset-top)); }
+  .chat { left: 0; right: 0; bottom: 0; width: 100%; height: 75vh; border-radius: 16px 16px 0 0; }
+  .search input { font-size: 16px; } /* iOS 자동 확대 방지 */
+}
+
+/* ---------- 버튼 글자색 (iOS 기본 파란색 제거) ---------- */
+button { color: inherit; }
+
+/* ---------- 모바일: 사이드바 = 아래 시트, 지도가 메인 ---------- */
+@media (max-width: 768px) {
+  :root { --sheet-h: 45vh; }
+  .layout { flex-direction: column; position: relative; }
+  .sidebar {
+    position: absolute; top: auto; left: 0; right: 0; bottom: 0;
+    width: 100%; height: var(--sheet-h); margin-left: 0 !important;
+    border-right: none; border-radius: 16px 16px 0 0;
+    box-shadow: 0 -6px 20px rgba(0,0,0,.12);
+    transition: height .25s;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .sidebar.collapsed { height: calc(48px + env(safe-area-inset-bottom)); }
+  .sidebar.collapsed .panel { display: none; }
+  .map-wrap { height: 100%; }
+  .chat-fab { bottom: calc(var(--sheet-h) + 16px); }
+  body:has(.sidebar.collapsed) .chat-fab { bottom: calc(64px + env(safe-area-inset-bottom)); }
+  .detail-card { top: 12px; bottom: auto; max-height: calc(100% - var(--sheet-h) - 24px); }
+}
+@media (max-width: 768px) {
+  /* 임시 지도 중심을 시트 위 보이는 영역으로 */
+  .map-placeholder { bottom: var(--sheet-h); }
+}

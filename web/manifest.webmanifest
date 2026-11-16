@@ -1,0 +1,17 @@
+{
+  "name": "캠퍼스맵 - 캠퍼스 생활 정보 지도",
+  "short_name": "캠퍼스맵",
+  "description": "교내 편의시설, 학식, 분실물 정보를 한곳에서",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#03c75a",
+  "lang": "ko",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
