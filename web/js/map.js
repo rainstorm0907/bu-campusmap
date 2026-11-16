@@ -2,197 +2,337 @@
  * ============================================================
  *  지도 모듈 (CampusMap)
  * ============================================================
- *  ★ 네이버 지도 API 담당 팀원이 작업할 파일입니다.
- *
- *  app.js 는 아래 5개 함수만 호출합니다. 함수 이름/인자만 유지하면
+ *  app.js 는 아래 함수만 호출합니다. 함수 이름/인자만 유지하면
  *  내부 구현은 자유롭게 바꿔도 됩니다.
  *
- *    CampusMap.init(containerId, center)        지도 생성
+ *    CampusMap.init(containerId, center, options)  지도 생성
+ *        options: { logo: {lat,lng,name,src}, onMapClick(), insets() }
+ *        insets(): 지도를 가리는 폭과 높이 { top, bottom, left } (px). 처음 보여줄 범위를 그 사이에 맞춤
  *    CampusMap.setMarkers(buildings, onClick)   건물 마커 표시 (기존 마커는 지움)
- *    CampusMap.focus(building)                  해당 건물로 이동 + 강조
+ *    CampusMap.setDimmed(ids)                   ids 에 없는 마커를 흐리게 (null 이면 모두 진하게)
+ *    CampusMap.focus(building, { bottomInset }) 해당 건물로 이동 + 강조
+ *        bottomInset: 화면 아래를 가리는 높이(px). 건물이 그 위쪽에 보이게 옮김
  *    CampusMap.clearSelection()                 강조 해제
  *    CampusMap.isReady()                        네이버 지도 사용 여부
- *    CampusMap.setUserLocation(pos)             내 위치 표시 ({lat,lng} 또는 null)
+ *    CampusMap.setUserLocation(pos)             내 위치 표시 ({lat,lng} 또는 null). 마커에 걸어서 몇 분이 붙음
  *    CampusMap.showDistanceLines(from, targets) 내 위치 → 식당 연결선 + 거리 라벨
  *        targets: [{ building, label }]  (빈 배열이면 선 지우기)
  *
- *  building 객체 형태: { id, name, lat, lng, ... }  (js/data.js 참고)
+ *  building 객체 형태: { id, name, lat, lng, type, ... }  (js/data.js 참고)
  *
- *  네이버 지도 스크립트(index.html <head>)가 없으면 자동으로
- *  "임시 지도"가 표시되어, 지도 없이도 나머지 기능을 개발할 수 있습니다.
+ *  네이버 지도 키(js/config.js)가 없거나 인증이 실패하면 자동으로
+ *  "임시 지도"로 바뀌어, 지도 없이도 나머지 기능이 동작합니다.
  * ============================================================
  */
 const CampusMap = (() => {
+  const U = CampusUtil;
   let container = null;
-  let map = null;          // naver.maps.Map 인스턴스
-  let markers = [];        // { id, marker } 목록
+  let opts = {};
+  let engine = null;            // NaverEngine 또는 Placeholder
+  let buildings = [];
+  let onMarkerClick = () => {};
   let selectedId = null;
+  let dimmed = null;            // Set 또는 null
+  let userPos = null;
+  let lastLines = null;
 
-  const hasNaver = () => typeof window.naver !== "undefined" && window.naver.maps;
+  const hasNaver = () => typeof window.naver !== "undefined" && window.naver.maps && window.naver.maps.Map;
+
+  /* -------------------- 마커 모양 (두 지도 공통) -------------------- */
+  const GLYPH = {
+    lecture: "M12 4L2 9l10 5 10-5zM6 11.5V15c0 1.7 2.7 3 6 3s6-1.3 6-3v-3.5l-6 3z",
+    food: "M7 2v8a2 2 0 0 0 2 2v10h2V12a2 2 0 0 0 2-2V2h-1.5v6h-1V2h-1v6h-1V2zM16 2c-1.7 0-3 2-3 5v5h2v10h2V2z",
+    sport: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 3a7 7 0 0 1 6.9 6H13V5.1zM11 5.1V11H5.1A7 7 0 0 1 11 5.1zM5.1 13H11v5.9A7 7 0 0 1 5.1 13zm7.9 5.9V13h5.9a7 7 0 0 1-5.9 5.9z",
+    art: "M12 3a9 9 0 0 0 0 18c1 0 1.5-.8 1.5-1.5 0-.9-.8-1.2-.8-2 0-.8.7-1.5 1.5-1.5H16a5 5 0 0 0 5-5c0-4.4-4-8-9-8zM7 12.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm4 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z",
+    hall: "M9 3v10.6A4 4 0 1 0 11 17V7h6V3z",
+    library: "M4 4h6a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4zM20 4h-6a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z",
+    office: "M4 21V5l8-3 8 3v16h-6v-5h-4v5zM8 8h2v2H8zm6 0h2v2h-2zm-6 4h2v2H8zm6 0h2v2h-2z",
+  };
+  const typeOf = (b) => (typeof BUILDING_TYPES !== "undefined" && BUILDING_TYPES[b.type]) || ["#4A7DFF", "건물"];
+  const glyph = (t) => GLYPH[t] || GLYPH.lecture;
+  const esc = (s = "") => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  function markerHTML(b) {
+    const on = selectedId === b.id;
+    const dim = dimmed && !dimmed.has(b.id);
+    const color = on ? "#03C75A" : typeOf(b)[0];
+    const size = on ? 17 : 13;
+    const mins = userPos ? `<span class="mk-min">${U.walkMinutes(U.distance(userPos, b))}분</span>` : "";
+    return `<div class="mk${on ? " on" : ""}${dim ? " dim" : ""}" data-id="${esc(b.id)}">
+      <span class="mk-dot" style="background:${color}"><svg width="${size}" height="${size}" viewBox="0 0 24 24"><path d="${glyph(b.type)}" fill="#fff" fill-rule="evenodd"/></svg></span>
+      <span class="mk-name">${esc(b.name)}</span>${mins}</div>`;
+  }
+  const logoHTML = (l) => `<div class="mk-logo"><span>${esc(l.name)}</span><i><img src="${esc(l.src)}" alt=""></i></div>`;
+  const userHTML = () => '<div class="user-dot"></div>';
 
   /* -------------------- 공개 함수 -------------------- */
 
-  function init(containerId, center) {
+  function init(containerId, center, options = {}) {
     container = document.getElementById(containerId);
-
-    if (hasNaver()) {
-      // TODO(지도 담당): 네이버 지도 생성
-      // map = new naver.maps.Map(container, {
-      //   center: new naver.maps.LatLng(center.lat, center.lng),
-      //   zoom: 17,
-      // });
+    opts = { ...options, center };
+    if (hasNaver() && window.MAP_STATUS !== "failed") {
+      engine = NaverEngine;
+      engine.init(container, opts);
+      // 인증이 실패하면 네이버가 빈 지도만 남기므로 임시 지도로 바꾼다
+      window.onNaverMapFail = switchToPlaceholder;
+      setTimeout(() => { if (engine === NaverEngine && !container.querySelector(".mk")) switchToPlaceholder(); }, 3000);
     } else {
-      Placeholder.init(container, center);
+      usePlaceholder();
     }
   }
 
-  function setMarkers(buildings, onClick) {
-    clearMarkers();
-
-    if (hasNaver()) {
-      // TODO(지도 담당): 건물마다 마커 생성 + 클릭 이벤트 연결
-      // buildings.forEach((b) => {
-      //   const marker = new naver.maps.Marker({
-      //     position: new naver.maps.LatLng(b.lat, b.lng),
-      //     map,
-      //     title: b.name,
-      //   });
-      //   naver.maps.Event.addListener(marker, "click", () => onClick(b));
-      //   markers.push({ id: b.id, marker });
-      // });
-    } else {
-      Placeholder.setMarkers(buildings, onClick);
-    }
+  function usePlaceholder() {
+    engine = Placeholder;
+    engine.init(container, opts);
   }
 
-  function focus(building) {
+  function switchToPlaceholder() {
+    if (engine !== NaverEngine) return;
+    NaverEngine.destroy();
+    usePlaceholder();
+    redraw();
+    if (userPos) engine.setUserLocation(userPos);
+    if (lastLines) engine.showDistanceLines(...lastLines);
+    const b = buildings.find((x) => x.id === selectedId);
+    if (b) engine.focus(b, lastFocusOpts);
+  }
+
+  function redraw() { engine.setMarkers(buildings, (b) => onMarkerClick(b)); }
+
+  function setMarkers(list, onClick) {
+    buildings = list.filter((b) => Number.isFinite(b.lat) && Number.isFinite(b.lng)); // 좌표 없는 건물은 목록에서만
+    onMarkerClick = onClick;
+    redraw();
+  }
+
+  function setDimmed(ids) {
+    dimmed = ids ? new Set(ids) : null;
+    redraw();
+  }
+
+  let lastFocusOpts = {};
+  function focus(building, focusOpts = {}) {
     selectedId = building.id;
-
-    if (hasNaver()) {
-      // TODO(지도 담당): 지도 이동 + 선택 마커 강조
-      // map.panTo(new naver.maps.LatLng(building.lat, building.lng));
-      // map.setZoom(18);
-    } else {
-      Placeholder.highlight(building.id);
-    }
+    lastFocusOpts = focusOpts;
+    redraw();
+    engine.focus(building, focusOpts);
   }
 
   function clearSelection() {
     selectedId = null;
-    if (!hasNaver()) Placeholder.highlight(null);
-    // TODO(지도 담당): 마커 강조 해제
-  }
-
-  function clearMarkers() {
-    if (hasNaver()) {
-      markers.forEach(({ marker }) => marker.setMap(null));
-    }
-    markers = [];
+    redraw();
   }
 
   function setUserLocation(pos) {
-    if (hasNaver()) {
-      // TODO(지도 담당): 내 위치 마커 (파란 점)
-      // if (userMarker) userMarker.setMap(null);
-      // if (!pos) return;
-      // userMarker = new naver.maps.Marker({
-      //   position: new naver.maps.LatLng(pos.lat, pos.lng), map,
-      //   icon: { content: '<div class="user-dot"></div>', anchor: new naver.maps.Point(9, 9) },
-      // });
-    } else {
-      Placeholder.setUserLocation(pos);
-    }
+    userPos = pos;
+    engine.setUserLocation(pos);
+    redraw();
   }
 
   function showDistanceLines(from, targets) {
-    if (hasNaver()) {
-      // TODO(지도 담당): 연결선(Polyline) + 거리 라벨(InfoWindow 또는 Marker content)
-      // lines.forEach((l) => l.setMap(null)); lines = [];
-      // targets.forEach(({ building, label }) => {
-      //   lines.push(new naver.maps.Polyline({
-      //     map, strokeColor: "#ff6b00", strokeWeight: 3, strokeStyle: "shortdash",
-      //     path: [new naver.maps.LatLng(from.lat, from.lng), new naver.maps.LatLng(building.lat, building.lng)],
-      //   }));
-      // });
-    } else {
-      Placeholder.showDistanceLines(from, targets);
-    }
+    lastLines = [from, targets];
+    engine.showDistanceLines(from, targets);
   }
 
   /* ----------------------------------------------------------
-   *  임시 지도 (네이버 지도 연동 전 개발용)
-   *  네이버 지도 연동이 끝나면 이 부분은 삭제해도 됩니다.
+   *  네이버 지도
+   * ---------------------------------------------------------- */
+  const NaverEngine = (() => {
+    let map = null;
+    let markers = [];
+    let extras = [];       // 로고, 내 위치
+    let userMarker = null;
+    let lines = [];
+    const LL = (p) => new naver.maps.LatLng(p.lat, p.lng);
+    const html = (content) => ({ content, anchor: new naver.maps.Point(0, 0) });
+
+    function init(el, o) {
+      map = new naver.maps.Map(el, {
+        center: LL(o.center), zoom: 17, minZoom: 15,
+        mapDataControl: false, scaleControl: false,
+        logoControl: true, logoControlOptions: { position: naver.maps.Position.LEFT_CENTER },
+      });
+      if (o.logo) extras.push(new naver.maps.Marker({ map, position: LL(o.logo), zIndex: 5, clickable: false, icon: html(logoHTML(o.logo)) }));
+      naver.maps.Event.addListener(map, "click", () => o.onMapClick && o.onMapClick());
+    }
+    function destroy() {
+      markers.forEach((m) => m.setMap(null));
+      extras.forEach((m) => m.setMap(null));
+      lines.forEach((l) => l.setMap(null));
+      userMarker?.setMap(null);
+      map?.destroy();
+      markers = []; extras = []; lines = []; userMarker = null; map = null;
+      container.innerHTML = "";
+    }
+    function setMarkers(list, onClick) {
+      markers.forEach((m) => m.setMap(null));
+      markers = list.map((b) => {
+        const m = new naver.maps.Marker({ map, position: LL(b), zIndex: selectedId === b.id ? 20 : 10, icon: html(markerHTML(b)) });
+        naver.maps.Event.addListener(m, "click", () => onClick(b));
+        return m;
+      });
+    }
+    function focus(b, { bottomInset = 0 } = {}) {
+      const proj = map.getProjection();
+      const pt = proj.fromCoordToOffset(LL(b));
+      map.panTo(proj.fromOffsetToCoord(new naver.maps.Point(pt.x, pt.y + bottomInset / 2)));
+    }
+    function setUserLocation(pos) {
+      userMarker?.setMap(null);
+      userMarker = pos ? new naver.maps.Marker({ map, position: LL(pos), zIndex: 15, clickable: false, icon: html(userHTML()) }) : null;
+    }
+    function showDistanceLines(from, targets) {
+      lines.forEach((l) => l.setMap(null));
+      lines = from ? targets.map(({ building }) => new naver.maps.Polyline({
+        map, path: [LL(from), LL(building)], strokeColor: "#FF7A2F", strokeWeight: 3, strokeStyle: "shortdash",
+      })) : [];
+    }
+    return { init, destroy, setMarkers, focus, setUserLocation, showDistanceLines };
+  })();
+
+  /* ----------------------------------------------------------
+   *  임시 지도 (네이버 지도 키가 없거나 인증 실패 시)
+   *  실제 좌표를 실제 거리 비율 그대로 화면에 옮깁니다. 손가락으로 끌어서 옮길 수 있습니다.
    * ---------------------------------------------------------- */
   const Placeholder = (() => {
-    let root = null;
-    let center = null;
-    const SCALE = 60000; // 위경도 → 픽셀 환산 배율 (임시)
-
+    let baseY = 0.31;      // 건물들 가운데를 둘 높이 (화면 높이 비율)
+    let baseX = 0.5;       // 건물들 가운데를 둘 가로 위치 (화면 폭 비율)
+    const LABEL_W = 80;    // 마커 오른쪽에 붙는 이름 폭
+    let PX_PER_M = 0.6;
+    let pinned = [];       // 좌표에 붙은 요소들 (배율이 바뀌면 다시 놓는다)
     const SVG_NS = "http://www.w3.org/2000/svg";
-    let svg = null;
-    let userDot = null;
-    const dx = (p) => (p.lng - center.lng) * SCALE;
-    const dy = (p) => -(p.lat - center.lat) * SCALE;
+    let root, layer, svg, center, userEl = null;
+    let pan = { x: 0, y: 0 };
+    const xy = (p) => ({
+      x: (p.lng - center.lng) * 111320 * Math.cos((center.lat * Math.PI) / 180) * PX_PER_M,
+      y: -(p.lat - center.lat) * 110950 * PX_PER_M,
+    });
+    const place = (el, p) => { const q = xy(p); el.style.left = `${q.x}px`; el.style.top = `${q.y}px`; };
+    const pin = (el, p) => { pinned.push([el, p]); place(el, p); layer.appendChild(el); };
 
-    function init(el, c) {
-      center = c;
+    /** 건물 전체가 시트 위 보이는 칸에 들어오도록 배율과 가운데를 정한다 */
+    function fit(list) {
+      if (!list.length) return;
+      const lat = list.map((b) => b.lat), lng = list.map((b) => b.lng);
+      center = { lat: (Math.min(...lat) + Math.max(...lat)) / 2, lng: (Math.min(...lng) + Math.max(...lng)) / 2 };
+      const wM = (Math.max(...lng) - Math.min(...lng)) * 111320 * Math.cos((center.lat * Math.PI) / 180);
+      const hM = (Math.max(...lat) - Math.min(...lat)) * 110950;
+      const H = root.clientHeight;
+      const W = root.clientWidth;
+      const ins = { top: 0, bottom: H * 0.5, left: 0, ...(opts.insets && opts.insets()) };
+      const free = Math.max(120, H - ins.top - ins.bottom - 40); // 보이는 칸 (이름 높이 여유 빼고)
+      baseY = (ins.top + (H - ins.bottom)) / 2 / H;
+      baseX = (ins.left + W) / 2 / W;
+      PX_PER_M = Math.min((W - ins.left - 40 - LABEL_W) / wM, free / hM, 1.2);
+      pan = { x: -LABEL_W / 2, y: 0 };
+      // 캠퍼스 바탕: 건물 범위보다 조금 넓은 타원
+      const cw = wM * PX_PER_M + 150, ch = hM * PX_PER_M + 110;
+      Object.assign(root.querySelector(".ph-campus").style, { width: `${cw}px`, height: `${ch}px`, left: `${-cw / 2 + 20}px`, top: `${-ch / 2}px` });
+      pinned.forEach(([el, p]) => place(el, p));
+      applyPan(false);
+    }
+    const applyPan = (animate) => {
+      layer.style.transition = animate ? "transform .35s ease" : "none";
+      layer.style.transform = `translate(${root.clientWidth * baseX + pan.x}px, ${root.clientHeight * baseY + pan.y}px)`;
+    };
+
+    function init(el, o) {
+      center = o.center;
+      el.innerHTML = "";
       root = document.createElement("div");
       root.className = "map-placeholder";
-      root.innerHTML = '<div class="notice">🗺️ 네이버 지도 연동 전 임시 지도입니다</div>';
-      svg = document.createElementNS(SVG_NS, "svg");
-      svg.setAttribute("class", "mock-lines");
-      root.appendChild(svg);
+      root.innerHTML = '<div class="notice">네이버 지도 연결 전 임시 지도</div><div class="ph-layer"><div class="ph-campus"></div><svg class="mock-lines"></svg></div>';
       el.appendChild(root);
+      setTimeout(() => root.querySelector(".notice")?.classList.add("gone"), 4000);
+      layer = root.querySelector(".ph-layer");
+      svg = root.querySelector(".mock-lines");
+      pinned = [];
+      if (o.logo) {
+        const logo = document.createElement("div");
+        logo.className = "ph-pin";
+        logo.innerHTML = logoHTML(o.logo);
+        pin(logo, o.logo);
+      }
+      applyPan(false);
+      // 끌어서 옮기기, 그냥 누르면 지도 탭
+      let start = null, moved = false;
+      root.addEventListener("pointerdown", (e) => { if (e.target.closest(".mk")) return; start = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y }; moved = false; });
+      root.addEventListener("pointermove", (e) => {
+        if (!start) return;
+        const dx = e.clientX - start.x, dy = e.clientY - start.y;
+        if (Math.abs(dx) + Math.abs(dy) > 6) moved = true;
+        if (moved) { touched = true; pan = { x: start.px + dx, y: start.py + dy }; applyPan(false); }
+      });
+      root.addEventListener("pointerup", (e) => {
+        if (start && !moved && !e.target.closest(".mk")) o.onMapClick && o.onMapClick();
+        start = null;
+      });
+    }
+
+    let fitted = false, touched = false;
+    function setMarkers(list, onClick) {
+      if (!fitted && list.length) {
+        fitted = true;
+        fit(list);
+        // 앱 안 웹 화면은 처음에 안전 여백이 늦게 들어와서, 자리 잡은 뒤 한 번 더 맞춘다
+        const refit = () => { if (!touched && !selectedId) fit(buildings); };
+        setTimeout(refit, 400);
+        window.addEventListener("resize", refit);
+      }
+      pinned = pinned.filter(([el]) => !el.classList.contains("b"));
+      layer.querySelectorAll(".ph-pin.b").forEach((m) => m.remove());
+      list.forEach((b) => {
+        const el = document.createElement("div");
+        el.className = "ph-pin b";
+        el.innerHTML = markerHTML(b);
+        if (selectedId === b.id) el.style.zIndex = 5;
+        el.firstElementChild.addEventListener("click", (e) => { e.stopPropagation(); onClick(b); });
+        pin(el, b);
+      });
+    }
+
+    function focus(b, { bottomInset = 0 } = {}) {
+      const q = xy(b);
+      const h = root.clientHeight;
+      const left = (opts.insets && opts.insets().left) || 0;
+      // 건물이 가려지지 않은 부분의 가운데쯤 오도록
+      const targetY = (h - bottomInset) * 0.5;
+      pan = { x: (left + root.clientWidth) / 2 - root.clientWidth * baseX - q.x, y: targetY - h * baseY - q.y };
+      applyPan(true);
     }
 
     function setUserLocation(pos) {
-      userDot?.remove();
-      userDot = null;
+      if (userEl) { userEl.remove(); pinned = pinned.filter(([el]) => el !== userEl); }
+      userEl = null;
       if (!pos) return;
-      userDot = document.createElement("div");
-      userDot.className = "user-dot";
-      userDot.style.left = `calc(50% + ${dx(pos)}px)`;
-      userDot.style.top = `calc(50% + ${dy(pos)}px)`;
-      root.appendChild(userDot);
+      userEl = document.createElement("div");
+      userEl.className = "ph-pin";
+      userEl.innerHTML = userHTML();
+      pin(userEl, pos);
     }
 
     function showDistanceLines(from, targets) {
       svg.innerHTML = "";
+      if (!from) return;
       targets.forEach(({ building, label }) => {
+        const a = xy(from), b = xy(building);
         const line = document.createElementNS(SVG_NS, "line");
-        line.setAttribute("x1", dx(from)); line.setAttribute("y1", dy(from));
-        line.setAttribute("x2", dx(building)); line.setAttribute("y2", dy(building));
+        line.setAttribute("x1", a.x); line.setAttribute("y1", a.y);
+        line.setAttribute("x2", b.x); line.setAttribute("y2", b.y);
         svg.appendChild(line);
         const text = document.createElementNS(SVG_NS, "text");
-        text.setAttribute("x", (dx(from) + dx(building)) / 2);
-        text.setAttribute("y", (dy(from) + dy(building)) / 2 - 4);
+        text.setAttribute("x", (a.x + b.x) / 2);
+        text.setAttribute("y", (a.y + b.y) / 2 - 4);
         text.textContent = label;
         svg.appendChild(text);
       });
     }
 
-    function setMarkers(buildings, onClick) {
-      root.querySelectorAll(".mock-marker").forEach((m) => m.remove());
-      buildings.forEach((b) => {
-        const btn = document.createElement("button");
-        btn.className = "mock-marker";
-        btn.dataset.id = b.id;
-        btn.textContent = b.name;
-        btn.style.left = `calc(50% + ${(b.lng - center.lng) * SCALE}px)`;
-        btn.style.top = `calc(50% - ${(b.lat - center.lat) * SCALE}px)`;
-        btn.addEventListener("click", () => onClick(b));
-        root.appendChild(btn);
-      });
-    }
-
-    function highlight(id) {
-      root.querySelectorAll(".mock-marker").forEach((m) =>
-        m.classList.toggle("selected", m.dataset.id === id)
-      );
-    }
-
-    return { init, setMarkers, highlight, setUserLocation, showDistanceLines };
+    return { init, setMarkers, focus, setUserLocation, showDistanceLines };
   })();
 
-  return { init, setMarkers, focus, clearSelection, setUserLocation, showDistanceLines, isReady: hasNaver };
+  return {
+    init, setMarkers, setDimmed, focus, clearSelection, setUserLocation, showDistanceLines,
+    isReady: () => engine === NaverEngine,
+  };
 })();

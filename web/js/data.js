@@ -1,9 +1,12 @@
 /**
  * 임시(목업) 데이터
  * - 나중에 백엔드/DB(API)로 교체할 부분입니다.
- * - 좌표(lat, lng)는 예시값입니다. 실제 학교 건물 좌표로 바꿔주세요.
+ * - 건물 이름과 좌표(lat, lng)는 OpenStreetMap의 백석대학교 건물 위치입니다 (2026-11-16 조회).
+ * - 건물 종류(type), 층별 시설(floors), 혼잡도(crowd), 평가(rating)는 화면 확인용 예시값입니다.
+ *   실제 자료는 자료 담당(2번)이 확인한 값으로 바꿔주세요.
  */
-const CAMPUS_CENTER = { lat: 37.5665, lng: 126.9780 };
+const CAMPUS_CENTER = { lat: 36.8397504, lng: 127.1850643 }; // OSM 백석대학교 영역 중심
+const CAMPUS_LOGO = { lat: 36.8406, lng: 127.1863, name: "백석대학교", src: "icons/bu-emblem.png" }; // 운동장 동쪽
 
 const FACILITY_TYPES = {
   convenience: "편의점",
@@ -15,37 +18,65 @@ const FACILITY_TYPES = {
   water: "정수기",
 };
 
+/** 지도 마커 종류: [색, 이름] */
+const BUILDING_TYPES = {
+  lecture: ["#4A7DFF", "강의동"],
+  food: ["#FF7A2F", "식당"],
+  sport: ["#14B8A6", "체육"],
+  art: ["#EC4899", "예술"],
+  hall: ["#F59E0B", "공연장"],
+  library: ["#0EA5E9", "도서관"],
+  office: ["#64748B", "행정"],
+};
+
+const fl = (floor, facilities, note = "") => ({ floor, facilities, note });
 const BUILDINGS = [
-  {
-    id: "b1", name: "본관", lat: 37.5672, lng: 126.9772,
-    floors: [
-      { floor: "1F", facilities: ["atm", "restroom"], note: "학사지원팀, 학생처" },
-      { floor: "2F", facilities: ["printer", "water"], note: "총무팀" },
-    ],
-  },
-  {
-    id: "b2", name: "학생회관", lat: 37.5660, lng: 126.9790,
-    floors: [
-      { floor: "B1", facilities: ["convenience"], note: "편의점 08:00~22:00" },
-      { floor: "1F", facilities: ["cafe", "lounge"], note: "학생식당" },
-      { floor: "2F", facilities: ["printer", "restroom"], note: "동아리방" },
-    ],
-  },
-  {
-    id: "b3", name: "중앙도서관", lat: 37.5668, lng: 126.9798,
-    floors: [
-      { floor: "1F", facilities: ["cafe", "printer", "water"], note: "대출/반납" },
-      { floor: "3F", facilities: ["lounge", "restroom"], note: "열람실" },
-    ],
-  },
-  {
-    id: "b4", name: "공학관", lat: 37.5656, lng: 126.9768,
-    floors: [
-      { floor: "1F", facilities: ["convenience", "atm"], note: "" },
-      { floor: "4F", facilities: ["printer", "lounge"], note: "실습실" },
-    ],
-  },
+  { id: "seungri", name: "승리관", lat: 36.841763, lng: 127.185758, type: "lecture", floors: [fl("1층", ["printer", "restroom"]), fl("2층", ["water"])] },
+  { id: "gym", name: "체육관", lat: 36.841366, lng: 127.187434, type: "sport", floors: [fl("1층", ["restroom", "water"])] },
+  { id: "johyung", name: "조형관", lat: 36.840894, lng: 127.188438, type: "art", floors: [fl("1층", ["cafe"]), fl("2층", ["restroom"])] },
+  { id: "mokyang", name: "목양관", lat: 36.840874, lng: 127.183654, type: "lecture", floors: [fl("1층", ["atm", "restroom"]), fl("2층", ["printer"])] },
+  { id: "bokji", name: "학생복지관", aliases: ["복지관"], lat: 36.840597, lng: 127.182496, type: "food",
+    floors: [fl("지하 1층", ["convenience"], "편의점 08:00~22:00"), fl("1층", ["cafe", "lounge"], "학생식당"), fl("2층", ["printer", "restroom"])],
+    crowd: { label: "조금 붐벼요", minutesAgo: 5, confirms: 7 } },
+  { id: "jinri", name: "진리관", lat: 36.840169, lng: 127.184518, type: "lecture", floors: [fl("1층", ["convenience", "printer"]), fl("3층", ["lounge"])] },
+  { id: "gyosu", name: "교수회관", lat: 36.839697, lng: 127.184804, type: "office", floors: [fl("1층", ["restroom"])] },
+  { id: "baekseokhall", name: "백석홀", lat: 36.839572, lng: 127.182658, type: "hall", floors: [fl("1층", ["cafe", "restroom"])] },
+  { id: "insung", name: "인성관", lat: 36.839405, lng: 127.183558, type: "lecture", floors: [fl("1층", ["printer"]), fl("2층", ["lounge", "water"])] },
+  { id: "bonbu", name: "본부동", lat: 36.83934, lng: 127.185784, type: "office", floors: [fl("1층", ["atm", "restroom"], "학사지원팀"), fl("2층", ["water"])] },
+  { id: "jihye", name: "지혜관", lat: 36.838751, lng: 127.184338, type: "lecture",
+    floors: [fl("1층", ["printer", "cafe"]), fl("2층", ["convenience", "lounge"])],
+    crowd: { label: "조금 붐벼요", minutesAgo: 5, confirms: 7 },
+    issues: [{ facility: "printer", floor: "1층", count: 2, minutesAgo: 10 }],
+    rating: { score: 4.1, parts: [["시설 상태", 4.2], ["깨끗함", 4.3], ["자리 여유", 2.6]],
+      reviews: [["2026학년도 2학기, 3일 전", "2층 라운지에 콘센트가 많아서 좋아요"], ["2026학년도 2학기, 1주 전", "1층 프린터가 자주 멈춰요. 2층 라운지 쪽이 조용해요"]] } },
+  { id: "art", name: "예술대학동", lat: 36.838723, lng: 127.187577, type: "art", floors: [fl("1층", ["restroom", "water"])] },
+  { id: "jayu", name: "자유관", lat: 36.838462, lng: 127.183223, type: "lecture", floors: [fl("1층", ["printer", "water"])] },
+  { id: "library", name: "백석학술정보관", aliases: ["도서관", "학술정보관"], lat: 36.837766, lng: 127.184041, type: "library",
+    floors: [fl("1층", ["cafe", "printer", "water"], "대출, 반납"), fl("3층", ["lounge", "restroom"], "열람실")] },
+  { id: "global", name: "글로벌 외식산업관", aliases: ["외식산업관"], lat: 36.837551, lng: 127.185125, type: "food",
+    floors: [fl("1층", ["convenience", "atm"], "푸드코트"), fl("2층", ["cafe"])] },
+  { id: "changjo", name: "창조관", lat: 36.837402, lng: 127.182419, type: "lecture", floors: [fl("1층", ["atm"]), fl("4층", ["printer", "lounge"], "실습실")] },
 ];
+
+/**
+ * 학사일정과 공지 (학교 홈페이지 2026년 11월 화면에서 옮김)
+ * - 관리자 페이지가 생기면 운영자가 올린 값으로 바꿉니다.
+ */
+const SCHEDULE = [
+  { start: "2026-11-01", title: "개교기념일", tag: "행사" },
+  { start: "2026-11-09", end: "2026-12-04", title: "2027학년도 1학기 전공변경, 전부(과) 신청", tag: "학적" },
+  { start: "2026-11-23", title: "수업일수 4분의 3", tag: "수업" },
+  { start: "2026-11-23", end: "2026-11-27", title: "동계 계절학기 수강신청", tag: "수강" },
+];
+const SCHEDULE_TAG_COLORS = { 행사: "#8B5CF6", 학적: "#03C75A", 수업: "#4A7DFF", 수강: "#FF7A2F" };
+const NOTICES = [
+  { date: "2026-08-26", title: "2026학년도 2학기 통학버스 운행시간표 변경" },
+  { date: "2026-11-09", title: "2026학년도 동계 토익스파르타 신청" },
+  { date: "2026-11-04", title: "2026학년도 2학기 학점인정 신청 안내" },
+  { date: "2026-11-03", title: "2026학년도 동계 계절학기 교과목 개설 신청" },
+  { date: "2026-11-02", title: "2026학년도 2학기 교내장학금 3차 면학" },
+];
+const SCHEDULE_UPDATED = "11월 9일 오전 9시";
 
 /**
  * 학식 데이터
@@ -54,7 +85,7 @@ const BUILDINGS = [
  */
 const CAFETERIAS = [
   {
-    id: "c1", name: "학생식당", buildingId: "b2", floor: "1F",
+    id: "c1", name: "학생식당", buildingId: "bokji", floor: "1층",
     hours: "11:00 ~ 14:00 / 17:00 ~ 19:00", price: "5,500원",
     weeklyMenu: {
       1: { lunch: ["제육볶음", "된장국", "계란말이", "김치"], dinner: ["돈까스", "우동", "단무지"] },
@@ -65,7 +96,7 @@ const CAFETERIAS = [
     },
   },
   {
-    id: "c2", name: "교직원식당", buildingId: "b1", floor: "2F",
+    id: "c2", name: "교직원식당", buildingId: "bonbu", floor: "2층",
     hours: "11:30 ~ 13:30", price: "7,000원",
     weeklyMenu: {
       1: { lunch: ["비빔밥", "미역국", "잡채", "깍두기"], dinner: [] },
@@ -76,7 +107,7 @@ const CAFETERIAS = [
     },
   },
   {
-    id: "c3", name: "공학관 푸드코트", buildingId: "b4", floor: "1F",
+    id: "c3", name: "푸드코트", buildingId: "global", floor: "1층",
     hours: "10:30 ~ 19:30", price: "4,500~6,500원",
     weeklyMenu: {
       1: { lunch: ["라면", "김밥", "돈까스"], dinner: ["라면", "김밥", "쫄면"] },
@@ -89,8 +120,8 @@ const CAFETERIAS = [
 ];
 
 const LOST_ITEMS = [
-  { id: "l1", type: "found", title: "파란색 텀블러", buildingId: "b3", place: "3층 열람실", desc: "", contact: "도서관 안내데스크", date: "2026-11-08" },
-  { id: "l2", type: "lost", title: "학생증", buildingId: "b4", place: "1층 편의점 근처", desc: "이름 김OO", contact: "오픈채팅", date: "2026-11-07" },
+  { id: "l1", type: "found", title: "파란색 텀블러", buildingId: "library", place: "3층 열람실", desc: "", contact: "도서관 안내데스크", date: "2026-11-08" },
+  { id: "l2", type: "lost", title: "학생증", buildingId: "jihye", place: "2층 편의점 근처", desc: "이름 김OO", contact: "오픈채팅", date: "2026-11-07" },
 ];
 
 const REPORTS = [];

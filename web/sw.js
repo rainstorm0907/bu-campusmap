@@ -2,11 +2,11 @@
  * 서비스 워커: 앱 파일을 캐시해서 오프라인에서도 화면이 열리게 함
  * 파일을 수정한 뒤 배포할 때는 CACHE 버전을 올려주세요.
  */
-const CACHE = "campusmap-v2";
+const CACHE = "campusmap-v3";
 const FILES = [
   "./", "./index.html", "./css/style.css",
   "./js/data.js", "./js/utils.js", "./js/api.js", "./js/map.js", "./js/chatbot.js", "./js/app.js",
-  "./manifest.webmanifest", "./icons/icon.svg", "./icons/icon-192.png", "./icons/icon-512.png",
+  "./js/config.js", "./manifest.webmanifest", "./icons/icon.svg", "./icons/bu-emblem.png", "./icons/icon-192.png", "./icons/icon-512.png",
 ];
 
 self.addEventListener("install", (e) => {
