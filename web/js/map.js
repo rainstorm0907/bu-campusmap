@@ -210,6 +210,21 @@ const CampusMap = (() => {
     const place = (el, p) => { const q = xy(p); el.style.left = `${q.x}px`; el.style.top = `${q.y}px`; };
     const pin = (el, p) => { pinned.push([el, p]); place(el, p); layer.appendChild(el); };
 
+    /** 캠퍼스 모양 (js/campus-shapes.js, OpenStreetMap) 을 지금 배율로 그린다 */
+    function drawShapes(sh) {
+      const d = (pts, close) => pts.map(([lat, lng], i) => { const q = xy({ lat, lng }); return `${i ? "L" : "M"}${q.x.toFixed(1)} ${q.y.toFixed(1)}`; }).join("") + (close ? "Z" : "");
+      const area = (list, cls) => list.map((pts) => `<path class="${cls}" d="${d(pts, true)}"/>`).join("");
+      const z = PX_PER_M / 0.5; // 확대할수록 길도 조금 굵게
+      const ROAD_W = Object.fromEntries(Object.entries({ tertiary: 8, secondary: 9, primary: 10, residential: 5, unclassified: 5, service: 3.2 }).map(([k, v]) => [k, +(v * Math.min(2.2, Math.max(0.8, z))).toFixed(1)]));
+      const roads = sh.roads.slice().sort((a, b) => (ROAD_W[a.k] || 5) - (ROAD_W[b.k] || 5));
+      const casing = roads.map((r) => `<path class="road-case" stroke-width="${(ROAD_W[r.k] || 3.2) + 1.6}" d="${d(r.p)}"/>`).join("");
+      const fill = roads.map((r) => `<path class="road ${r.k === "tertiary" || r.k === "secondary" || r.k === "primary" ? "major" : ""}" stroke-width="${ROAD_W[r.k] || 3.2}" d="${d(r.p)}"/>`).join("");
+      root.querySelector(".ph-shapes").innerHTML =
+        area(sh.campus, "campus") + area(sh.grass, "grass") + area(sh.pitch, "pitch") + area(sh.water, "water") + area(sh.parking, "parking") +
+        casing + fill + sh.paths.map((p) => `<path class="path" d="${d(p)}"/>`).join("") +
+        sh.buildings.map((b) => `<path class="bldg" d="${d(b.p, true)}"/>`).join("");
+    }
+
     /** 건물 전체가 시트 위 보이는 칸에 들어오도록 배율과 가운데를 정한다 */
     function fit(list) {
       if (!list.length) return;
@@ -223,11 +238,14 @@ const CampusMap = (() => {
       const free = Math.max(120, H - ins.top - ins.bottom - 40); // 보이는 칸 (이름 높이 여유 빼고)
       baseY = (ins.top + (H - ins.bottom)) / 2 / H;
       baseX = (ins.left + W) / 2 / W;
-      PX_PER_M = Math.min((W - ins.left - 40 - LABEL_W) / wM, free / hM, 1.2);
+      PX_PER_M = fitScale = Math.min((W - ins.left - 40 - LABEL_W) / wM, free / hM, 1.2);
       pan = { x: -LABEL_W / 2, y: 0 };
-      // 캠퍼스 바탕: 건물 범위보다 조금 넓은 타원
-      const cw = wM * PX_PER_M + 150, ch = hM * PX_PER_M + 110;
-      Object.assign(root.querySelector(".ph-campus").style, { width: `${cw}px`, height: `${ch}px`, left: `${-cw / 2 + 20}px`, top: `${-ch / 2}px` });
+      if (typeof CAMPUS_SHAPES !== "undefined") drawShapes(CAMPUS_SHAPES);
+      else {
+        // 모양 자료가 없으면 건물 범위보다 조금 넓은 타원으로 캠퍼스를 표시
+        const cw = wM * PX_PER_M + 150, ch = hM * PX_PER_M + 110;
+        Object.assign(root.querySelector(".ph-campus").style, { width: `${cw}px`, height: `${ch}px`, left: `${-cw / 2 + 20}px`, top: `${-ch / 2}px` });
+      }
       pinned.forEach(([el, p]) => place(el, p));
       applyPan(false);
     }
@@ -241,7 +259,7 @@ const CampusMap = (() => {
       el.innerHTML = "";
       root = document.createElement("div");
       root.className = "map-placeholder";
-      root.innerHTML = '<div class="notice">네이버 지도 연결 전 임시 지도</div><div class="ph-layer"><div class="ph-campus"></div><svg class="mock-lines"></svg></div>';
+      root.innerHTML = '<div class="notice">네이버 지도 연결 전 임시 지도</div><div class="ph-layer"><div class="ph-campus"></div><svg class="ph-shapes"></svg><svg class="mock-lines"></svg></div>';
       el.appendChild(root);
       setTimeout(() => root.querySelector(".notice")?.classList.add("gone"), 4000);
       layer = root.querySelector(".ph-layer");
@@ -254,22 +272,73 @@ const CampusMap = (() => {
         pin(logo, o.logo);
       }
       applyPan(false);
-      // 끌어서 옮기기, 그냥 누르면 지도 탭
-      let start = null, moved = false;
-      root.addEventListener("pointerdown", (e) => { if (e.target.closest(".mk")) return; start = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y }; moved = false; });
+      // 한 손가락: 끌어서 옮기기, 그냥 누르면 지도 탭 / 두 손가락: 벌리고 오므려 확대, 축소 / 마우스 휠: 확대, 축소
+      const ptrs = new Map();
+      let start = null, moved = false, pinchD = 0;
+      const local = (x, y) => { const r = root.getBoundingClientRect(); return [x - r.left, y - r.top]; };
+      const pinchInfo = () => {
+        const [a, b] = [...ptrs.values()];
+        return { d: Math.hypot(a.x - b.x, a.y - b.y), m: local((a.x + b.x) / 2, (a.y + b.y) / 2) };
+      };
+      root.addEventListener("pointerdown", (e) => {
+        if (e.target.closest(".mk")) return;
+        ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (ptrs.size === 2) { pinchD = pinchInfo().d; moved = true; start = null; return; }
+        start = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y };
+        moved = false;
+      });
       root.addEventListener("pointermove", (e) => {
+        if (!ptrs.has(e.pointerId)) return;
+        ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (ptrs.size === 2) {
+          const { d, m } = pinchInfo();
+          if (pinchD) zoomBy(d / pinchD, m[0], m[1]);
+          pinchD = d;
+          return;
+        }
         if (!start) return;
         const dx = e.clientX - start.x, dy = e.clientY - start.y;
         if (Math.abs(dx) + Math.abs(dy) > 6) moved = true;
         if (moved) { touched = true; pan = { x: start.px + dx, y: start.py + dy }; applyPan(false); }
       });
-      root.addEventListener("pointerup", (e) => {
-        if (start && !moved && !e.target.closest(".mk")) o.onMapClick && o.onMapClick();
-        start = null;
-      });
+      const up = (e) => {
+        const wasTap = start && !moved && ptrs.size === 1 && !e.target.closest(".mk");
+        ptrs.delete(e.pointerId);
+        if (wasTap) o.onMapClick && o.onMapClick();
+        if (ptrs.size === 1) { const [p] = [...ptrs.values()]; start = { x: p.x, y: p.y, px: pan.x, py: pan.y }; }
+        else start = null;
+        pinchD = 0;
+      };
+      root.addEventListener("pointerup", up);
+      root.addEventListener("pointercancel", up);
+      root.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        const [fx, fy] = local(e.clientX, e.clientY);
+        zoomBy(Math.exp(-e.deltaY * 0.0025), fx, fy);
+      }, { passive: false });
     }
 
     let fitted = false, touched = false;
+    let fitScale = 0.6, lastLines = null;
+
+    /** 화면의 (fx, fy) 점을 그대로 둔 채 k 배 확대 */
+    function zoomBy(k, fx, fy) {
+      const next = Math.min(fitScale * 5, Math.max(fitScale * 0.7, PX_PER_M * k));
+      k = next / PX_PER_M;
+      if (Math.abs(k - 1) < 0.001) return;
+      const W = root.clientWidth, H = root.clientHeight;
+      const tx = W * baseX + pan.x, ty = H * baseY + pan.y;
+      pan = { x: fx - (fx - tx) * k - W * baseX, y: fy - (fy - ty) * k - H * baseY };
+      PX_PER_M = next;
+      touched = true;
+      redrawAll();
+    }
+    function redrawAll() {
+      pinned.forEach(([el, p]) => place(el, p));
+      if (typeof CAMPUS_SHAPES !== "undefined") drawShapes(CAMPUS_SHAPES);
+      if (lastLines) showDistanceLines(...lastLines);
+      applyPan(false);
+    }
     function setMarkers(list, onClick) {
       if (!fitted && list.length) {
         fitted = true;
@@ -312,6 +381,7 @@ const CampusMap = (() => {
     }
 
     function showDistanceLines(from, targets) {
+      lastLines = [from, targets];
       svg.innerHTML = "";
       if (!from) return;
       targets.forEach(({ building, label }) => {

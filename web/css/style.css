@@ -65,6 +65,18 @@ h2 { margin: 0; }
 .map-placeholder .notice.gone { opacity: 0; }
 .ph-layer { position: absolute; left: 0; top: 0; width: 0; height: 0; }
 .ph-campus { position: absolute; border-radius: 50%; background: #eaf3e3; border: 1.5px solid #cfe3c2; }
+.ph-shapes { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+.ph-shapes path { stroke-linejoin: round; stroke-linecap: round; }
+.ph-shapes .campus { fill: #e8f1df; stroke: #c9ddb9; stroke-width: 1.5; }
+.ph-shapes .grass { fill: #d9eecb; }
+.ph-shapes .pitch { fill: #c6e6b3; stroke: #b2d99c; }
+.ph-shapes .water { fill: #a9d4f5; }
+.ph-shapes .parking { fill: #ecebe7; stroke: #dfddd8; }
+.ph-shapes .road-case { fill: none; stroke: #dedbd4; }
+.ph-shapes .road { fill: none; stroke: #ffffff; }
+.ph-shapes .road.major { stroke: #ffe58f; }
+.ph-shapes .path { fill: none; stroke: #ffffff; stroke-width: 2; stroke-dasharray: 3 3; }
+.ph-shapes .bldg { fill: #d9d4ca; stroke: #bdb6aa; stroke-width: 1; }
 .ph-pin { position: absolute; }
 .mock-lines { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
 .mock-lines line { stroke: #ff7a2f; stroke-width: 2.5; stroke-dasharray: 6 5; }
