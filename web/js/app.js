@@ -203,10 +203,8 @@
     const now = today();
     const upcoming = SCHEDULE.filter((s) => (s.end || s.start) >= now).slice(0, 3);
     const cells = upcoming.map((s, i) => {
-      const color = SCHEDULE_TAG_COLORS[s.tag] || "#4A7DFF";
       const when = s.end && s.start <= now ? `${korDate(s.end)}까지` : s.end ? `${korDate(s.start)}부터` : korDate(s.start);
-      return `<div class="cell${i === 0 ? " now" : ""}"><span class="tag" style="color:${color};background:${color}1A">${esc(s.tag)}</span>
-        <b>${when}</b><span>${esc(s.title)}</span></div>`;
+      return `<div class="cell${i === 0 ? " now" : ""}"><b>${when}</b><span>${esc(s.title)}</span></div>`;
     }).join("");
     const list = state.homeTab === "schedule"
       ? SCHEDULE.map((s) => `<li class="row"><span class="k">${korDate(s.start)}</span><div><p>${esc(s.title)}</p>${s.end ? `<small>${korDate(s.end)}까지</small>` : ""}</div></li>`).join("")

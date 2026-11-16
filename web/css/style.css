@@ -44,7 +44,6 @@ h2 { margin: 0; }
 .mk { display: flex; align-items: center; gap: 5px; white-space: nowrap; cursor: pointer; transform: translate(-11px, -11px); }
 .mk-dot { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(29, 29, 31, .3); flex: none; }
 .mk-name { font-size: 12.5px; font-weight: 600; color: var(--text); text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff; }
-.mk-min { font-size: 11.5px; font-weight: 500; color: #6e7480; text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff; }
 .mk.dim { opacity: .28; }
 .mk.on { transform: translate(-15px, -15px); }
 .mk.on .mk-dot { width: 30px; height: 30px; }
@@ -142,7 +141,6 @@ h2 { margin: 0; }
 .cell { padding: 11px 11px 12px; border-left: 1px solid var(--soft); display: flex; flex-direction: column; gap: 3px; }
 .cell:first-child { border-left: 0; }
 .cell.now { background: var(--primary-soft); }
-.cell .tag { align-self: flex-start; font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 5px; margin-bottom: 3px; }
 .cell b { font-size: 14.5px; font-weight: 600; }
 .cell.now b { color: var(--primary-dark); }
 .cell > span:last-child { font-size: 12.5px; color: var(--muted); line-height: 1.45; }

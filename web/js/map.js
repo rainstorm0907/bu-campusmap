@@ -14,7 +14,7 @@
  *        bottomInset: 화면 아래를 가리는 높이(px). 건물이 그 위쪽에 보이게 옮김
  *    CampusMap.clearSelection()                 강조 해제
  *    CampusMap.isReady()                        네이버 지도 사용 여부
- *    CampusMap.setUserLocation(pos)             내 위치 표시 ({lat,lng} 또는 null). 마커에 걸어서 몇 분이 붙음
+ *    CampusMap.setUserLocation(pos)             내 위치 표시 ({lat,lng} 또는 null)
  *    CampusMap.showDistanceLines(from, targets) 내 위치 → 식당 연결선 + 거리 라벨
  *        targets: [{ building, label }]  (빈 배열이면 선 지우기)
  *
@@ -25,7 +25,6 @@
  * ============================================================
  */
 const CampusMap = (() => {
-  const U = CampusUtil;
   let container = null;
   let opts = {};
   let engine = null;            // NaverEngine 또는 Placeholder
@@ -57,10 +56,9 @@ const CampusMap = (() => {
     const dim = dimmed && !dimmed.has(b.id);
     const color = on ? "#03C75A" : typeOf(b)[0];
     const size = on ? 17 : 13;
-    const mins = userPos ? `<span class="mk-min">${U.walkMinutes(U.distance(userPos, b))}분</span>` : "";
     return `<div class="mk${on ? " on" : ""}${dim ? " dim" : ""}" data-id="${esc(b.id)}">
       <span class="mk-dot" style="background:${color}"><svg width="${size}" height="${size}" viewBox="0 0 24 24"><path d="${glyph(b.type)}" fill="#fff" fill-rule="evenodd"/></svg></span>
-      <span class="mk-name">${esc(b.name)}</span>${mins}</div>`;
+      <span class="mk-name">${esc(b.name)}</span></div>`;
   }
   const logoHTML = (l) => `<div class="mk-logo"><span>${esc(l.name)}</span><i><img src="${esc(l.src)}" alt=""></i></div>`;
   const userHTML = () => '<div class="user-dot"></div>';
@@ -126,7 +124,6 @@ const CampusMap = (() => {
   function setUserLocation(pos) {
     userPos = pos;
     engine.setUserLocation(pos);
-    redraw();
   }
 
   function showDistanceLines(from, targets) {
@@ -197,7 +194,7 @@ const CampusMap = (() => {
   const Placeholder = (() => {
     let baseY = 0.31;      // 건물들 가운데를 둘 높이 (화면 높이 비율)
     let baseX = 0.5;       // 건물들 가운데를 둘 가로 위치 (화면 폭 비율)
-    const LABEL_W = 80;    // 마커 오른쪽에 붙는 이름 폭
+    const LABEL_W = 60;    // 마커 오른쪽에 붙는 이름 폭
     let PX_PER_M = 0.6;
     let pinned = [];       // 좌표에 붙은 요소들 (배율이 바뀌면 다시 놓는다)
     const SVG_NS = "http://www.w3.org/2000/svg";
