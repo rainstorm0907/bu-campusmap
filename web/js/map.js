@@ -13,15 +13,17 @@
  *    CampusMap.focus(building, { bottomInset }) 해당 건물로 이동 + 강조
  *        bottomInset: 화면 아래를 가리는 높이(px). 건물이 그 위쪽에 보이게 옮김
  *    CampusMap.clearSelection()                 강조 해제
- *    CampusMap.isReady()                        네이버 지도 사용 여부
+ *    CampusMap.isReady()                        네이버 지도(웹 또는 앱) 사용 여부
  *    CampusMap.setUserLocation(pos)             내 위치 표시 ({lat,lng} 또는 null)
  *    CampusMap.showDistanceLines(from, targets) 내 위치 → 식당 연결선 + 거리 라벨
  *        targets: [{ building, label }]  (빈 배열이면 선 지우기)
  *
  *  building 객체 형태: { id, name, lat, lng, type, ... }  (js/data.js 참고)
  *
- *  네이버 지도 키(js/config.js)가 없거나 인증이 실패하면 자동으로
- *  "임시 지도"로 바뀌어, 지도 없이도 나머지 기능이 동작합니다.
+ *  지도 엔진은 셋 중 하나:
+ *    - 아이폰 앱 + 네이버 키: 앱의 네이버 지도(3D 건물)를 웹 아래에 깔고 명령만 보냄 (NativeEngine)
+ *    - 브라우저 + 네이버 키(js/config.js): 네이버 웹 지도 (NaverEngine)
+ *    - 키가 없거나 인증 실패: 임시 지도 (Placeholder). 지도 없이도 나머지 기능이 동작합니다.
  * ============================================================
  */
 const CampusMap = (() => {
@@ -53,7 +55,7 @@ const CampusMap = (() => {
 
   function markerHTML(b) {
     const on = selectedId === b.id;
-    const dim = dimmed && !dimmed.has(b.id);
+    const dim = !on && dimmed && !dimmed.has(b.id);
     const color = on ? "#03C75A" : typeOf(b)[0];
     const size = on ? 17 : 13;
     return `<div class="mk${on ? " on" : ""}${dim ? " dim" : ""}" data-id="${esc(b.id)}">
@@ -68,7 +70,10 @@ const CampusMap = (() => {
   function init(containerId, center, options = {}) {
     container = document.getElementById(containerId);
     opts = { ...options, center };
-    if (hasNaver() && window.MAP_STATUS !== "failed") {
+    if (window.CAMPUS_NATIVE_MAP && window.webkit?.messageHandlers?.campusMap) {
+      engine = NativeEngine;
+      engine.init(container, opts);
+    } else if (hasNaver() && window.MAP_STATUS !== "failed") {
       engine = NaverEngine;
       engine.init(container, opts);
       // 인증이 실패하면 네이버가 빈 지도만 남기므로 임시 지도로 바꾼다
@@ -85,8 +90,8 @@ const CampusMap = (() => {
   }
 
   function switchToPlaceholder() {
-    if (engine !== NaverEngine) return;
-    NaverEngine.destroy();
+    if (engine === Placeholder) return;
+    engine.destroy();
     usePlaceholder();
     redraw();
     if (userPos) engine.setUserLocation(userPos);
@@ -130,6 +135,81 @@ const CampusMap = (() => {
     lastLines = [from, targets];
     engine.showDistanceLines(from, targets);
   }
+
+  /* ----------------------------------------------------------
+   *  아이폰 앱의 네이버 지도 (ios/CampusMap/NativeMap.swift)
+   *  지도는 웹 아래에 깔려 있고, 여기서는 명령만 보낸다.
+   *  웹 화면에서 손가락을 받을 칸(검색창, 시트, 버튼)을 계속 알려줘서 그 밖의 손가락은 지도로 간다.
+   * ---------------------------------------------------------- */
+  const NativeEngine = (() => {
+    const post = (msg) => window.webkit.messageHandlers.campusMap.postMessage(msg);
+    const HIT = ".top > *, .fab, #sheet, #fixReport, #chatPanel";
+    let taps = {};
+    let fitted = false;
+    let observer = null, raf = 0, until = 0, last = "";
+    const insetsNow = () => {
+      const i = (opts.insets && opts.insets()) || {};
+      return { top: Math.round(i.top || 0), bottom: Math.round(Math.min(i.bottom || 0, window.innerHeight * 0.6)) };
+    };
+
+    function reportHit() {
+      const full = !!document.querySelector("dialog[open]");
+      const rects = [...document.querySelectorAll(HIT)].filter((el) => el.getClientRects().length)
+        .map((el) => el.getBoundingClientRect()).filter((r) => r.width && r.height)
+        .map((r) => [r.left, r.top, r.width, r.height].map(Math.round));
+      const { top } = insetsNow();
+      const key = JSON.stringify([full, rects, top]);
+      if (key === last) return;
+      last = key;
+      post({ cmd: "hit", full, rects, top });
+    }
+    // 시트가 움직이는 동안은 매 프레임 알린다
+    const loop = () => { raf = 0; reportHit(); if (performance.now() < until) raf = requestAnimationFrame(loop); };
+    const kick = () => { until = performance.now() + 500; if (!raf) raf = requestAnimationFrame(loop); };
+
+    function init(el, o) {
+      document.documentElement.classList.add("native-map");
+      window.__nativeMap = {
+        markerTap: (id) => taps[id] && taps[id](),
+        mapTap: () => o.onMapClick && o.onMapClick(),
+        failed: () => switchToPlaceholder(),
+      };
+      if (o.logo) post({ cmd: "logo", ...o.logo });
+      observer = new MutationObserver(kick);
+      observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["style", "class", "hidden", "open"] });
+      window.addEventListener("resize", kick);
+      document.addEventListener("transitionend", kick, true);
+      kick();
+      post({ cmd: "ready" });
+    }
+    function destroy() {
+      observer?.disconnect();
+      window.removeEventListener("resize", kick);
+      document.removeEventListener("transitionend", kick, true);
+      document.documentElement.classList.remove("native-map");
+    }
+    function setMarkers(list, onClick) {
+      taps = Object.fromEntries(list.map((b) => [b.id, () => onClick(b)]));
+      post({ cmd: "markers", list: list.map((b) => ({
+        id: b.id, name: b.name, lat: b.lat, lng: b.lng, type: b.type || "lecture",
+        color: selectedId === b.id ? "#03C75A" : typeOf(b)[0], selected: selectedId === b.id, dim: selectedId !== b.id && !!(dimmed && !dimmed.has(b.id)),
+      })) });
+      if (!fitted && list.length) {
+        fitted = true;
+        // 앱 안 웹 화면은 처음에 안전 여백이 늦게 들어와서, 자리 잡은 뒤 맞춘다
+        setTimeout(() => post({ cmd: "fit", points: buildings.map(({ lat, lng }) => ({ lat, lng })), ...insetsNow() }), 400);
+      }
+    }
+    function focus(b, { bottomInset = 0 } = {}) {
+      post({ cmd: "focus", lat: b.lat, lng: b.lng, top: insetsNow().top, bottom: Math.round(bottomInset) });
+    }
+    function setUserLocation(pos) { post({ cmd: "user", pos: pos ? { lat: pos.lat, lng: pos.lng } : null }); }
+    function showDistanceLines(from, targets) {
+      post({ cmd: "lines", from: from ? { lat: from.lat, lng: from.lng } : null,
+        targets: from ? targets.map(({ building, label }) => ({ lat: building.lat, lng: building.lng, label })) : [] });
+    }
+    return { init, destroy, setMarkers, focus, setUserLocation, showDistanceLines };
+  })();
 
   /* ----------------------------------------------------------
    *  네이버 지도
@@ -400,6 +480,6 @@ const CampusMap = (() => {
 
   return {
     init, setMarkers, setDimmed, focus, clearSelection, setUserLocation, showDistanceLines,
-    isReady: () => engine === NaverEngine,
+    isReady: () => engine === NaverEngine || engine === NativeEngine,
   };
 })();

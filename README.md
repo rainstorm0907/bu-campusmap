@@ -31,10 +31,21 @@ iOS 앱: `ios/CampusMap.xcodeproj` 를 Xcode 로 열고 시뮬레이터에서 �
 
 ## 네이버 지도 키
 
-키가 없어도 임시 지도로 다 동작해요. 실제 네이버 지도를 쓰려면:
+키가 없어도 임시 지도로 다 동작해요.
 
-1. NCP 콘솔 > Application 에서 Web Dynamic Map 을 켜고 Client ID 를 받아요.
-2. 지도를 여는 주소(`http://localhost`, 배포 주소)를 웹 서비스 URL 에 등록해요. 포트는 빼고 적어요.
-3. `web/js/config.js` 의 `NAVER_MAP_KEY_ID` 에 Client ID 를 넣어요.
+**iOS 앱 (3D 건물이 보이는 네이버 지도)**
 
-앱은 폰 안의 파일로 웹을 열어서 웹 지도 인증이 안 돼요. 앱에서 네이버 지도를 보려면 웹을 배포하고 `ios/CampusMap/AppConfig.swift` 의 `remoteURL` 에 그 주소를 넣어요.
+앱은 아래에 네이버 지도(아이폰 SDK)를 깔고, 그 위에 `web/` 화면을 투명하게 겹쳐요. 지도를 기울이면 학교 건물이 입체로 보여요.
+
+1. NCP 콘솔 > Application 에서 Mobile Dynamic Map 을 켜고, iOS 번들 ID 를 등록해요. 지금 번들 ID 는 `com.example.campusmap` (`ios/Config/Base.xcconfig`).
+2. `ios/Config/Secrets.xcconfig.example` 을 `ios/Config/Secrets.xcconfig` 로 복사하고 Client ID 를 넣어요. 이 파일은 깃에 안 올라가요.
+3. Xcode 로 다시 빌드해요. 처음 열 때 네이버 지도 패키지를 내려받아요.
+
+관련 코드: `ios/CampusMap/NativeMap.swift` (지도), `ios/CampusMap/WebView.swift` (겹치기), `web/js/map.js` 의 `NativeEngine` (웹 → 지도 명령)
+
+**브라우저**
+
+1. NCP 콘솔 > Application 에서 Web Dynamic Map 을 켜고, 지도를 여는 주소(`http://localhost`, 배포 주소)를 웹 서비스 URL 에 등록해요. 포트는 빼고 적어요.
+2. `web/js/config.js` 의 `NAVER_MAP_KEY_ID` 에 Client ID 를 넣어요.
+
+웹 네이버 지도는 기울이기가 없어서 평면으로 보여요.

@@ -1,0 +1,9 @@
+// 앱 공통 설정. 키는 여기 적지 말고 Secrets.xcconfig(깃에 안 올라감)에 적습니다.
+// Secrets.xcconfig.example 을 복사해서 Secrets.xcconfig 를 만드세요.
+PRODUCT_BUNDLE_IDENTIFIER = com.example.campusmap
+
+// 네이버 클라우드 콘솔 > Application 의 Client ID (Mobile Dynamic Map 을 켜고, 위 번들 ID 를 등록해야 함)
+// 비워두면 앱도 임시 지도로 동작합니다.
+NAVER_MAP_NCP_KEY_ID =
+
+#include? "Secrets.xcconfig"

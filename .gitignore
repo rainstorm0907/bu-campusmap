@@ -1,5 +1,6 @@
 .DS_Store
 xcuserdata/
 DerivedData/
-dd/
+dd*/
 *.xcuserstate
+ios/Config/Secrets.xcconfig
