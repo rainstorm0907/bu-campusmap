@@ -1,72 +1,67 @@
-# bu-campusmap
+# 백석대 캠퍼스맵
 
-백석대학교 학생 참여형 캠퍼스 생활 정보 지도. 지도 위에서 건물, 학식, 학사일정, 시설 제보를 한 화면에 봐요.
+백석대 학생이 지도 한 화면에서 건물, 학식, 학사일정을 보고, 틀린 정보는 직접 제보하는 캠퍼스 생활 지도입니다. 화면은 웹 하나로 만들고, iOS 앱은 그 화면을 네이버 3D 지도 위에 띄웁니다.
 
-## 폴더
+![화면](docs/screens.jpg)
 
-| 폴더 | 내용 |
-|---|---|
-| `web/` | 화면 전부 (HTML/CSS/JS). 브라우저와 iOS 앱이 같이 씀 |
-| `ios/` | `web/` 을 띄우는 iOS 앱 (SwiftUI + WKWebView, 아래에 네이버 3D 지도) |
-| `server/` | 데이터 저장과 API (Flask + SQLite). 관리자 로그인, 학식 메뉴, 제보, 분실물, 챗봇. 자세한 건 `server/README.md` |
+## 빠른 실행
 
-`web/js` 안:
+필요한 것만 골라서 실행합니다.
 
-- `app.js` 화면 흐름 (하단 시트: 학사일정 홈, 목록, 건물 요약, 건물 페이지), 학식, 제보, 챗봇 연결
-- `map.js` 지도. 네이버 지도 키가 있으면 네이버 지도, 없으면 캠퍼스 모양을 그린 임시 지도
-- `data.js` 건물·식당·일정 데이터. 서버가 꺼져 있을 때 이 값으로 동작해요. 건물 좌표는 OpenStreetMap 실제 위치, 식당은 데이터 담당 자료, 시설·혼잡도·평가는 예시값
-- `campus-shapes.js` 임시 지도용 캠퍼스 윤곽 (OpenStreetMap)
-- `config.js` 네이버 지도 키 넣는 곳
+**화면만 보기** (설치 없음, 예시 데이터)
 
-## 실행
-
-서버 (화면까지 같이 열려요):
-
-```sh
-cd server
-pip install -r requirements.txt
-python seed.py          # 처음 한 번: DB 만들기 + 건물·식당·메뉴 + 관리자 계정(admin / admin1234)
-python app.py           # http://localhost:8000
-```
-
-- DB 구조(`server/schema.sql`)가 바뀐 걸 받았으면 `python seed.py --reset` 으로 다시 만들어요.
-- 학식 메뉴는 서버가 날짜가 바뀔 때마다 이번 주 빈 칸을 채워요 (`server/menu_auto.py`). 실제 메뉴를 가져오는 방법이 정해지면 그 파일의 `fetch_menus()` 만 바꾸면 돼요.
-
-서버 없이 화면만 (예시 데이터로 동작):
-
-```sh
+```bash
 cd web
 python3 -m http.server 8765
-# http://localhost:8765
 ```
 
-iOS 앱: `ios/CampusMap.xcodeproj` 를 Xcode 로 열고 시뮬레이터에서 실행. 앱 안에 `web/` 폴더가 그대로 들어가요. 내 맥에서 서버가 켜져 있으면 앱이 그 서버(`http://localhost:8000`, `ios/CampusMap/AppConfig.swift`)를 써요. 꺼져 있으면 예시 데이터로 동작해요.
+→ <http://localhost:8765>
+
+**서버까지 같이** (데이터 저장, 관리자, 학식 메뉴)
+
+```bash
+cd server
+pip install -r requirements.txt
+python seed.py      # 처음 한 번: DB 만들기
+python app.py
+```
+
+→ <http://localhost:8000> (화면도 같이 열립니다. 관리자 계정 `admin` / `admin1234`)
+
+맥에서 `python`이 없다고 나오면 `python3`, `pip3`로 실행합니다.
+
+**iOS 앱** (맥 + Xcode)
+
+`ios/CampusMap.xcodeproj`를 열고 실행합니다. 내 맥에서 서버가 켜져 있으면 앱이 그 서버를 쓰고, 꺼져 있으면 예시 데이터로 동작합니다.
 
 ## 네이버 지도 키
 
-키가 없어도 임시 지도로 다 동작해요.
+키가 없어도 임시 지도로 모든 기능이 동작합니다. iOS 앱에서 3D 지도를 보려면:
 
-**iOS 앱 (3D 건물이 보이는 네이버 지도)**
+1. `ios/Config/Secrets.xcconfig.example`을 복사해 `Secrets.xcconfig`로 이름을 바꿉니다.
+2. 안에 `NAVER_MAP_NCP_KEY_ID = 팀키`를 적습니다. 팀 키는 단톡에 있습니다.
+3. 다시 빌드합니다.
 
-앱은 아래에 네이버 지도(아이폰 SDK)를 깔고, 그 위에 `web/` 화면을 투명하게 겹쳐요. 지도를 기울이면 학교 건물이 입체로 보여요.
+브라우저에서 네이버 지도를 보려면 `web/js/config.js`에 같은 키를 넣고 `localhost`로 엽니다. 이 파일은 깃에 올라가니 키를 넣은 채로 커밋하지 않습니다.
 
-1. 팀 키는 이미 있어요 (NCP 앱 `bu-campusmap`, 번들 ID `com.example.campusmap` 등록됨). Client ID 는 팀 단톡에서 받아요.
-2. `ios/Config/Secrets.xcconfig.example` 을 `ios/Config/Secrets.xcconfig` 로 복사하고 Client ID 를 넣어요. 이 파일은 깃에 안 올라가요.
-3. Xcode 로 다시 빌드해요. 처음 열 때 네이버 지도 패키지를 내려받아요.
+`Secrets.xcconfig`는 깃에 올라가지 않습니다. 저장소가 공개라서 키는 단톡에서만 주고받습니다. 번들 ID(`com.example.campusmap`)는 키에 등록된 값이라 바꾸지 않습니다.
 
-번들 ID 는 바꾸지 마세요. 바꾸면 네이버 콘솔에도 새 번들 ID 를 등록해야 지도가 떠요.
+## 어디를 고치면 되나
 
-관련 코드: `ios/CampusMap/NativeMap.swift` (지도), `ios/CampusMap/WebView.swift` (겹치기), `web/js/map.js` 의 `NativeEngine` (웹 → 지도 명령)
+| 고치고 싶은 것 | 파일 |
+|---|---|
+| 화면 흐름, 하단 시트, 건물 카드 | `web/js/app.js` |
+| 색, 글자, 간격 | `web/css/style.css` |
+| 지도, 마커 | `web/js/map.js` (앱의 3D 지도는 `ios/CampusMap/NativeMap.swift`) |
+| 건물, 식당, 일정 데이터 | `web/js/data.js`와 `server/seed.py` (같은 내용이라 둘 다 고칩니다) |
+| 검색창, 챗봇 AI | `web/js/chatbot.js`, `server/chatbot.py` |
+| API, DB | `server/app.py`, `server/schema.sql` ([서버 문서](server/README.md)) |
+| 학식 메뉴 자동 채우기 | `server/menu_auto.py` |
 
-**브라우저**
+## 알아둘 것
 
-1. 같은 팀 키에 `http://localhost`, `http://127.0.0.1` 이 등록돼 있어요. 다른 주소로 열려면 NCP 콘솔에서 웹 서비스 URL 을 추가해요.
-2. `web/js/config.js` 의 `NAVER_MAP_KEY_ID` 에 Client ID 를 넣어요. 이 파일은 깃에 올라가니까 키를 넣은 채로 커밋하지 마세요.
-
-웹 네이버 지도는 기울이기가 없어서 평면으로 보여요.
-
-## 검색창에 AI 붙이는 자리
-
-- 검색창 "무엇이든 물어보세요": `web/js/app.js` 의 검색 부분 (`searchForm` 제출). 지금은 건물·시설·분실물을 글자로 찾아요.
-- 답을 만드는 곳: `web/js/chatbot.js` 의 `CampusBot.reply(text, ctx)`. `{ text, buildingId? }` 를 돌려주면 돼요. `buildingId` 가 있으면 지도에서 그 건물로 갈 수 있어요.
-- AI API 키는 웹 코드에 넣지 말고 서버를 거쳐서 불러요. 웹 코드는 누구나 볼 수 있어요.
+- 서버가 꺼져 있으면 화면은 `web/js/data.js`의 예시 데이터로 동작합니다.
+- `server/schema.sql`이 바뀐 걸 받았으면 `python seed.py --reset`으로 DB를 다시 만듭니다.
+- iOS 앱은 맥에서만 빌드됩니다. 윈도우에서는 `web/`만 고쳐도 앱 화면에 그대로 들어갑니다.
+- 키와 비밀번호는 커밋하지 않습니다. `Secrets.xcconfig`, `.env`, DB 파일은 자동으로 제외됩니다.
+- AI API 키는 웹 코드에 넣지 않고 서버 환경변수로만 읽습니다.
