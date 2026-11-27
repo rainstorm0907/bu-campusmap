@@ -37,16 +37,18 @@ iOS 앱: `ios/CampusMap.xcodeproj` 를 Xcode 로 열고 시뮬레이터에서 �
 
 앱은 아래에 네이버 지도(아이폰 SDK)를 깔고, 그 위에 `web/` 화면을 투명하게 겹쳐요. 지도를 기울이면 학교 건물이 입체로 보여요.
 
-1. NCP 콘솔 > Application 에서 Mobile Dynamic Map 을 켜고, iOS 번들 ID 를 등록해요. 지금 번들 ID 는 `com.example.campusmap` (`ios/Config/Base.xcconfig`).
+1. 팀 키는 이미 있어요 (NCP 앱 `bu-campusmap`, 번들 ID `com.example.campusmap` 등록됨). Client ID 는 팀 단톡에서 받아요.
 2. `ios/Config/Secrets.xcconfig.example` 을 `ios/Config/Secrets.xcconfig` 로 복사하고 Client ID 를 넣어요. 이 파일은 깃에 안 올라가요.
 3. Xcode 로 다시 빌드해요. 처음 열 때 네이버 지도 패키지를 내려받아요.
+
+번들 ID 는 바꾸지 마세요. 바꾸면 네이버 콘솔에도 새 번들 ID 를 등록해야 지도가 떠요.
 
 관련 코드: `ios/CampusMap/NativeMap.swift` (지도), `ios/CampusMap/WebView.swift` (겹치기), `web/js/map.js` 의 `NativeEngine` (웹 → 지도 명령)
 
 **브라우저**
 
-1. NCP 콘솔 > Application 에서 Web Dynamic Map 을 켜고, 지도를 여는 주소(`http://localhost`, 배포 주소)를 웹 서비스 URL 에 등록해요. 포트는 빼고 적어요.
-2. `web/js/config.js` 의 `NAVER_MAP_KEY_ID` 에 Client ID 를 넣어요.
+1. 같은 팀 키에 `http://localhost`, `http://127.0.0.1` 이 등록돼 있어요. 다른 주소로 열려면 NCP 콘솔에서 웹 서비스 URL 을 추가해요.
+2. `web/js/config.js` 의 `NAVER_MAP_KEY_ID` 에 Client ID 를 넣어요. 이 파일은 깃에 올라가니까 키를 넣은 채로 커밋하지 마세요.
 
 웹 네이버 지도는 기울이기가 없어서 평면으로 보여요.
 
