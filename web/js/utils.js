@@ -38,5 +38,20 @@ const CampusUtil = (() => {
     return cafe.weeklyMenu?.[day]?.[meal] || [];
   }
 
-  return { DAY_NAMES, distance, walkMinutes, formatDistance, isOpenNow, currentMeal, getMenu };
+  /**
+   * 건물 사이 이동 예상 (직선거리로 계산한 대략값)
+   * - 도보: 길이 돌아가는 걸 감안해 직선거리 x1.3, 분당 67m
+   * - 차량: 교내 도로를 돌아가는 걸 감안해 직선거리 x1.5 + 150m, 시속 25km(분당 417m), 주차 시간 제외
+   *   서버가 켜져 있으면 차량은 네이버 실시간 교통 값(/api/route)으로 바뀌어요. 이 값은 서버가 없을 때 예비용.
+   */
+  function routeEstimate(a, b) {
+    const straight = distance(a, b);
+    const walkM = straight * 1.3;
+    const carM = straight * 1.5 + 150;
+    const walkMin = Math.max(1, Math.ceil(walkM / WALK_M_PER_MIN));
+    const carMin = Math.max(1, Math.ceil(carM / 417));
+    return { straight, walkM, walkMin, carM, carMin, walkFaster: walkMin <= carMin };
+  }
+
+  return { DAY_NAMES, distance, walkMinutes, formatDistance, isOpenNow, currentMeal, getMenu, routeEstimate };
 })();

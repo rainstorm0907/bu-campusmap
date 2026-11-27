@@ -23,6 +23,7 @@ from werkzeug.exceptions import HTTPException
 import auth
 import chatbot
 import menu_auto
+import routing
 from db import (BASE_DIR, building_dict, cafeteria_dict, close_db, get_db, lost_dict, menu_dict,
                 report_dict, save_building_floors)
 
@@ -478,6 +479,34 @@ def upload():
 @app.get("/uploads/<path:name>")
 def uploaded(name):
     return send_from_directory(UPLOAD_DIR, name)
+
+
+# ================================================================
+#  길찾기: 차량 이동 시간 (네이버 Directions 5, 실시간 교통) → routing.py
+# ================================================================
+
+CAMPUS = (36.8397504, 127.1850643)
+
+
+def _point(name):
+    try:
+        lat, lng = (float(x) for x in request.args.get(name, "").split(","))
+    except ValueError:
+        raise ApiError(f"{name} 는 '위도,경도' 형식이어야 해요")
+    # 캠퍼스 근처(약 5km)만 허용 → 키를 다른 용도로 쓰지 못하게
+    if abs(lat - CAMPUS[0]) > 0.045 or abs(lng - CAMPUS[1]) > 0.056:
+        raise ApiError("캠퍼스 근처 위치만 찾을 수 있어요")
+    return lat, lng
+
+
+@app.get("/api/route")
+def route():
+    """?from=위도,경도&to=위도,경도 → {carMin, distanceM, at, source: "naver"}"""
+    a, b = _point("from"), _point("to")
+    try:
+        return jsonify(source="naver", **routing.driving(a[0], a[1], b[0], b[1]))
+    except routing.RouteError as e:
+        raise ApiError(str(e), 503)
 
 
 # ================================================================
