@@ -2,7 +2,8 @@
  * 임시(목업) 데이터
  * - 나중에 백엔드/DB(API)로 교체할 부분입니다.
  * - 건물 이름과 좌표(lat, lng)는 OpenStreetMap의 백석대학교 건물 위치입니다 (2026-11-16 조회).
- * - 건물 종류(type), 층별 시설(floors), 혼잡도(crowd), 평가(rating)는 화면 확인용 예시값입니다.
+ * - 건물 종류(type), 층별 시설(floors), 혼잡도(crowd), 평가(rating)는 화면 확인용 예시값입니다. 진리관 층 정보는 팀원 화면 값.
+ * - levels: [지상 층수, 지하 층수], elevator: 엘리베이터 여부 (모르면 비워 둠)
  *   실제 자료는 자료 담당(2번)이 확인한 값으로 바꿔주세요.
  */
 const CAMPUS_CENTER = { lat: 36.8397504, lng: 127.1850643 }; // OSM 백석대학교 영역 중심
@@ -29,7 +30,8 @@ const BUILDING_TYPES = {
   office: ["#64748B", "행정"],
 };
 
-const fl = (floor, facilities, note = "") => ({ floor, facilities, note });
+/** 층 하나: 층 이름, 시설 분류(FACILITY_TYPES 키, 분류 칩과 챗봇이 씀), 메모, 카드에 보일 이름들(없으면 시설 분류 이름) */
+const fl = (floor, facilities, note = "", places) => ({ floor, facilities, note, ...(places && { places }) });
 const BUILDINGS = [
   { id: "seungri", name: "승리관", lat: 36.841763, lng: 127.185758, type: "lecture", floors: [fl("1층", ["printer", "restroom"]), fl("2층", ["water"])] },
   { id: "gym", name: "체육관", lat: 36.841366, lng: 127.187434, type: "sport", floors: [fl("1층", ["restroom", "water"])] },
@@ -38,7 +40,8 @@ const BUILDINGS = [
   { id: "bokji", name: "학생복지관", aliases: ["복지관"], lat: 36.840597, lng: 127.182496, type: "food",
     floors: [fl("지하 1층", ["convenience"], "편의점 08:00~22:00"), fl("1층", ["cafe", "lounge"], "학생식당"), fl("2층", ["printer", "restroom"])],
     crowd: { label: "조금 붐벼요", minutesAgo: 5, confirms: 7 } },
-  { id: "jinri", name: "진리관", lat: 36.840169, lng: 127.184518, type: "lecture", floors: [fl("1층", ["convenience", "printer"]), fl("3층", ["lounge"])] },
+  { id: "jinri", name: "진리관", lat: 36.840169, lng: 127.184518, type: "lecture", levels: [5, 1], elevator: false,
+    floors: [fl("1층", ["atm"], "", ["서점", "문구점", "신한은행", "우편취급국", "보건실"]), fl("지하 1층", ["convenience"], "", ["편의점"])] },
   { id: "gyosu", name: "교수회관", lat: 36.839697, lng: 127.184804, type: "office", floors: [fl("1층", ["restroom"])] },
   { id: "baekseokhall", name: "백석홀", lat: 36.839572, lng: 127.182658, type: "hall", floors: [fl("1층", ["cafe", "restroom"])] },
   { id: "insung", name: "인성관", lat: 36.839405, lng: 127.183558, type: "lecture", floors: [fl("1층", ["printer"]), fl("2층", ["lounge", "water"])] },
@@ -59,23 +62,30 @@ const BUILDINGS = [
 ];
 
 /**
- * 학사일정과 공지 (학교 홈페이지 2026년 11월 화면에서 옮김)
- * - 관리자 페이지가 생기면 운영자가 올린 값으로 바꿉니다.
+ * 곧 있을 일들 (시트 첫 화면)
+ * - cat: academic(학사) / club(동아리) / festival(축제) / event(교내 행사, 전체에서만 보임)
+ * - start: 시작일, end: 끝나는 날(마감일). 하루짜리는 start 만.
+ * - due: 마감 카드 아래 붙는 말 (예: "접수 마감"), place: 장소와 시간
+ * - 학사는 학교 홈페이지 2026년 11월 화면에서 옮긴 값. 나머지는 팀원 화면의 예시값.
+ *   관리자 페이지가 생기면 운영자가 올린 값으로 바꿉니다.
  */
-const SCHEDULE = [
-  { start: "2026-11-01", title: "개교기념일" },
-  { start: "2026-11-09", end: "2026-12-04", title: "2027학년도 1학기 전공변경, 전부(과) 신청" },
-  { start: "2026-11-23", title: "수업일수 4분의 3" },
-  { start: "2026-11-23", end: "2026-11-27", title: "동계 계절학기 수강신청" },
+const EVENT_CATS = {
+  academic: { label: "학사", bg: "#E3F1DA", fg: "#2F6B1F" },
+  club: { label: "동아리", bg: "#FCE8D6", fg: "#A2480B" },
+  festival: { label: "축제", bg: "#F9E3EC", fg: "#9C2257" },
+  event: { label: "교내 행사", bg: "#DDE9FA", fg: "#1F4E9C" },
+};
+const EVENTS = [
+  { cat: "academic", start: "2026-11-01", title: "개교기념일" },
+  { cat: "academic", start: "2026-11-09", end: "2026-12-04", title: "2027학년도 1학기 전공변경·전부(과) 신청" },
+  { cat: "academic", start: "2026-11-23", title: "수업일수 4분의 3" },
+  { cat: "academic", start: "2026-11-23", end: "2026-11-27", title: "동계 계절학기 수강신청", due: "신청 마감" },
+  { cat: "festival", end: "2026-11-28", title: "겨울 축제 공연팀 오디션", due: "접수 마감" },
+  { cat: "event", end: "2026-11-29", title: "교내 해커톤 참가 접수", due: "접수 마감" },
+  { cat: "club", end: "2026-11-30", title: "동아리 박람회 사전 신청", due: "신청 마감" },
+  { cat: "club", start: "2026-11-30", title: "동아리 박람회", place: "학생회관 앞 광장 · 10:00" },
+  { cat: "festival", start: "2026-12-03", title: "겨울 축제 라인업 공개", place: "공식 계정에서 발표" },
 ];
-const NOTICES = [
-  { date: "2026-08-26", title: "2026학년도 2학기 통학버스 운행시간표 변경" },
-  { date: "2026-11-09", title: "2026학년도 동계 토익스파르타 신청" },
-  { date: "2026-11-04", title: "2026학년도 2학기 학점인정 신청 안내" },
-  { date: "2026-11-03", title: "2026학년도 동계 계절학기 교과목 개설 신청" },
-  { date: "2026-11-02", title: "2026학년도 2학기 교내장학금 3차 면학" },
-];
-const SCHEDULE_UPDATED = "11월 9일 오전 9시";
 
 /**
  * 학식 데이터

@@ -4,7 +4,7 @@
  * - 서버가 켜져 있으면 DB(관리자 앱에서 올린 실제 메뉴 등)를 사용하고,
  *   아니면 js/data.js 예시 데이터 + localStorage 로 동작합니다.
  * - 화면 구성: 지도 전체 + 위 검색창과 분류 + 아래 시트
- *   시트 내용: 학사일정(처음) / 목록(분류, 검색) / 건물 요약 / 건물 페이지(끝까지 올렸을 때)
+ *   시트 내용: 곧 있을 일들(처음) / 목록(분류, 검색) / 건물 요약 / 건물 페이지(끝까지 올렸을 때)
  */
 (() => {
   const U = CampusUtil;
@@ -48,7 +48,10 @@
     lostFilter: "all",
     view: { kind: "home" }, // home | list | summary | page
     prevView: null,
-    homeTab: "schedule",
+    homeTab: "all",   // 곧 있을 일들: all | academic | club | festival
+    homeAll: false,   // "전체 보기"
+    calMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1), // 학사 달력에 보이는 달
+    calDay: null,     // 달력에서 누른 날 (YYYY-MM-DD)
     pageTab: "home",
     floorIdx: 0,
     votes: {},
@@ -198,26 +201,95 @@
     return `<span class="type" style="color:${color};background:${color}1A">${label}</span>`;
   };
 
-  /* ---------- 학사일정 (처음 화면) ---------- */
-  function viewHome() {
+  /* ---------- 곧 있을 일들 (처음 화면) ---------- */
+  const md = (s) => { const [, m, d] = s.split("-").map(Number); return `${m}/${d}`; };
+  const daysTo = (s) => Math.round((new Date(`${s}T00:00`) - new Date(`${today()}T00:00`)) / 86400000);
+  const dLabel = (n) => (n === 0 ? "D-DAY" : `D-${n}`);
+  const URGENT_DAYS = 3; // 마감까지 며칠 남으면 "마감 임박" 카드로 올릴지
+  const isUrgent = (e) => e.end && daysTo(e.end) >= 0 && daysTo(e.end) <= URGENT_DAYS && (!e.start || e.start <= today());
+  /** 목록에 보일 날짜와 설명: 아직 안 시작했으면 시작일, 진행 중이면 마감일 */
+  function eventWhen(e) {
     const now = today();
-    const upcoming = SCHEDULE.filter((s) => (s.end || s.start) >= now).slice(0, 3);
-    const cells = upcoming.map((s, i) => {
-      const when = s.end && s.start <= now ? `${korDate(s.end)}까지` : s.end ? `${korDate(s.start)}부터` : korDate(s.start);
-      return `<div class="cell${i === 0 ? " now" : ""}"><b>${when}</b><span>${esc(s.title)}</span></div>`;
+    if (!e.end) return { date: e.start, sub: e.place || "" };
+    if (e.start && e.start > now) return { date: e.start, sub: e.place || `${korDate(e.start)}부터` };
+    return { date: e.end, sub: e.place || `${korDate(e.end)}까지` };
+  }
+  const HOME_TABS = [["all", "전체"], ["academic", "학사"], ["club", "동아리"], ["festival", "축제"]];
+
+  function urgentCards(list) {
+    const cards = list.filter(isUrgent).sort((x, y) => x.end.localeCompare(y.end));
+    if (!cards.length) return "";
+    return `<div class="head sec"><h3>마감 임박</h3>${cards.length > 2 ? `<span class="quiet">옆으로 넘겨보세요</span>` : ""}</div>
+      <div class="dcards">${cards.map((e) => {
+        const c = EVENT_CATS[e.cat];
+        const n = daysTo(e.end);
+        return `<div class="dcard"><div class="dbox" style="background:${c.bg};color:${c.fg}"><span class="dday${n <= 2 ? " hot" : ""}">${dLabel(n)}</span><b>${esc(e.title)}</b></div>
+          <small>${md(e.end)} ${esc(e.due || "마감")}</small></div>`;
+      }).join("")}</div>`;
+  }
+
+  function upcomingList(list) {
+    const now = today();
+    const rows = list.filter((e) => (e.end || e.start) >= now && !isUrgent(e))
+      .map((e) => ({ e, w: eventWhen(e) }))
+      .sort((x, y) => x.w.date.localeCompare(y.w.date));
+    const shown = state.homeAll ? rows : rows.slice(0, 4);
+    return `<div class="head sec"><h3>다가오는 일정</h3>${rows.length > 4 ? `<button class="more" data-act="home-all">${state.homeAll ? "접기" : "전체 보기"}</button>` : ""}</div>
+      <ul class="erows">${shown.map(({ e, w }) => `<li><span class="k">${md(w.date)}</span><div><p>${esc(e.title)}</p>${w.sub ? `<small>${esc(w.sub)}</small>` : ""}</div>
+        <i class="thumb" style="background:${EVENT_CATS[e.cat].bg}"></i></li>`).join("") || `<li class="empty">다가오는 일정이 없어요</li>`}</ul>`;
+  }
+
+  /** 학사: 달력 + 그 달 학사 일정 */
+  function academicView() {
+    const now = today();
+    const list = EVENTS.filter((e) => e.cat === "academic");
+    const m0 = state.calMonth;
+    const y = m0.getFullYear(), m = m0.getMonth();
+    const key = (d) => ymd(new Date(y, m, d));
+    const marked = new Set(list.flatMap((e) => [e.start, e.end].filter(Boolean)));
+    const first = new Date(y, m, 1).getDay();
+    const days = new Date(y, m + 1, 0).getDate();
+    const cells = [...Array(first).fill(""), ...Array.from({ length: days }, (_, i) => i + 1)].map((d, i) => {
+      if (!d) return "<span></span>";
+      const k = key(d);
+      const cls = [i % 7 === 0 ? "sun" : "", k === now ? "today" : "", k === state.calDay ? "pick" : ""].join(" ").trim();
+      return `<button data-act="cal-day" data-d="${k}" class="${cls}">${d}${marked.has(k) ? "<i></i>" : ""}</button>`;
     }).join("");
-    const list = state.homeTab === "schedule"
-      ? SCHEDULE.map((s) => `<li class="row"><span class="k">${korDate(s.start)}</span><div><p>${esc(s.title)}</p>${s.end ? `<small>${korDate(s.end)}까지</small>` : ""}</div></li>`).join("")
-      : NOTICES.slice().sort((a, b) => b.date.localeCompare(a.date)).map((n) => `<li class="row"><span class="k">${korDate(n.date)}</span><p>${esc(n.title)}</p></li>`).join("");
-    const d = new Date();
-    return `<div class="head"><h2>학사일정</h2><span class="quiet">${d.getMonth() + 1}월 ${d.getDate()}일 ${DAY_KO[d.getDay()]}</span></div>
-      ${cells ? `<div class="cells">${cells}</div>` : ""}
-      <div class="seg">
-        <button data-act="home-tab" data-t="schedule" class="${state.homeTab === "schedule" ? "on" : ""}">이번 달 일정</button>
-        <button data-act="home-tab" data-t="notice" class="${state.homeTab === "notice" ? "on" : ""}">공지사항</button>
+    const monthStart = key(1), monthEnd = key(days);
+    const inView = (e) => state.calDay
+      ? (e.start || e.end) <= state.calDay && (e.end || e.start) >= state.calDay
+      : state.homeAll || ((e.start || e.end) <= monthEnd && (e.end || e.start) >= monthStart);
+    const rows = list.filter(inView).map((e) => {
+      let date = e.start || e.end, sub = "", badge;
+      if (e.end && e.start && e.start <= now && e.end >= now) {
+        const n = daysTo(e.end);
+        if (n <= 7) { date = e.end; sub = `${korDate(e.end)}까지`; badge = `<span class="badge blue">${dLabel(n)}</span>`; }
+        else { sub = `${korDate(e.start)}부터`; badge = `<span class="badge">진행 중</span>`; }
+      } else if ((e.end || e.start) < now) {
+        sub = e.end ? `${korDate(e.end)}까지` : ""; badge = `<span class="badge past">끝남</span>`;
+      } else {
+        sub = e.end ? `${korDate(e.end)}까지` : ""; badge = `<span class="badge blue">${dLabel(daysTo(date))}</span>`;
+      }
+      return { date, html: `<li class="${(e.end || e.start) < now ? "past" : ""}"><span class="k">${md(date)}</span><div><p>${esc(e.title)}</p>${sub ? `<small>${sub}</small>` : ""}</div>${badge}</li>` };
+    }).sort((a, b) => a.date.localeCompare(b.date)).map((r) => r.html).join("");
+    const title = state.calDay ? `${korDate(state.calDay)} 학사 일정` : "학사 일정";
+    return `<div class="cal">
+        <div class="cal-head"><button data-act="cal-move" data-n="-1" aria-label="이전 달">‹</button><b>${y}년 ${m + 1}월</b><button data-act="cal-move" data-n="1" aria-label="다음 달">›</button></div>
+        <div class="cal-grid wk">${["일", "월", "화", "수", "목", "금", "토"].map((d, i) => `<span class="${i ? "" : "sun"}">${d}</span>`).join("")}</div>
+        <div class="cal-grid">${cells}</div>
       </div>
-      <ul class="rows">${list}</ul>
-      <p class="src">운영자가 올린 일정, ${esc(SCHEDULE_UPDATED)} 기준</p>`;
+      <div class="head sec"><h3>${title}</h3>${state.calDay ? `<button class="more" data-act="cal-day" data-d="${state.calDay}">이 달 전체</button>` : `<button class="more" data-act="home-all">${state.homeAll ? "이 달만" : "전체 보기"}</button>`}</div>
+      <ul class="erows">${rows || `<li class="empty">이 기간에 학사 일정이 없어요</li>`}</ul>`;
+  }
+
+  function viewHome() {
+    const d = new Date();
+    const tab = state.homeTab;
+    const list = tab === "all" ? EVENTS : EVENTS.filter((e) => e.cat === tab);
+    const inner = tab === "academic" ? academicView() : urgentCards(list) + upcomingList(list);
+    return `<div class="head home-head"><h2>곧 있을 일들</h2><span class="quiet">${d.getMonth() + 1}월 ${d.getDate()}일 ${DAY_KO[d.getDay()]}</span></div>
+      <div class="etabs">${HOME_TABS.map(([k, l]) => `<button data-act="home-tab" data-t="${k}" class="${tab === k ? `on${k === "all" ? " dark" : ""}` : ""}">${l}</button>`).join("")}</div>
+      ${inner}`;
   }
 
   /* ---------- 목록: 분류, 검색 ---------- */
@@ -309,17 +381,44 @@
   }
 
   /* ---------- 건물 요약 (마커를 누르면) ---------- */
+  /** "지하 1층" → -1, "3층" → 3 */
+  const floorNum = (s) => { const n = parseInt(String(s).replace(/[^0-9]/g, ""), 10) || 1; return /지하|B/i.test(s) ? -n : n; };
+  const floorTag = (n) => (n < 0 ? `B${-n}` : `${n}F`);
+  /** 위층부터 아래층까지. 정보 없는 층이 이어지면 "2–5F" 처럼 묶는다 */
+  function floorStack(b) {
+    const known = new Map((b.floors || []).map((f) => [floorNum(f.floor), f]));
+    const nums = [...known.keys()];
+    const top = Math.max(b.levels?.[0] || 1, ...nums), bottom = Math.min(-(b.levels?.[1] || 0) || 1, ...nums);
+    const out = [];
+    for (let n = top; n >= bottom; n--) {
+      if (n === 0) continue;
+      const f = known.get(n);
+      const last = out[out.length - 1];
+      if (!f && b.levels && last && !last.f) { last.lo = n; continue; }
+      if (!f && !b.levels) continue;
+      out.push({ hi: n, lo: n, f });
+    }
+    return out;
+  }
   function viewSummary(b) {
-    const fac = [...new Set(facilitiesOf(b))].map((t) => FACILITY_TYPES[t]).join(", ");
-    const cafes = cafesOf(b).map((c) => c.name).join(", ");
-    return `<div class="head head-top"><div><h2 class="bt">${esc(b.name)}</h2><div class="meta">${typeChip(b)}<span class="quiet">${walk(b) ? `지금 위치에서 ${walk(b)}` : ""}</span></div></div>
+    const sub = [b.levels ? `지상 ${b.levels[0]}층${b.levels[1] ? `, 지하 ${b.levels[1]}층` : ""}` : (BUILDING_TYPES[b.type] || [])[1],
+      b.elevator === false ? "엘리베이터 없음" : b.elevator ? "엘리베이터 있음" : ""].filter(Boolean);
+    const rows = floorStack(b);
+    const stack = rows.map((r, i) => {
+      const tag = r.hi === r.lo ? floorTag(r.hi) : `${floorTag(r.lo)}–${floorTag(r.hi)}`.replace(/^(\d+)F–/, "$1–");
+      const names = r.f ? (r.f.places || r.f.facilities.map((t) => FACILITY_TYPES[t] || t)) : [];
+      const next = rows[i + 1];
+      const line = next ? `<i class="fline${r.f && next.f ? " on" : ""}"></i>` : "";
+      return `<li class="${r.f ? "" : "none"}">${line}<span class="ftag">${tag}</span>
+        <div class="fchips">${names.length ? names.map((x) => `<span>${esc(x)}</span>`).join("") : `<em>등록된 정보 없음</em>`}</div></li>`;
+    }).join("");
+    return `<div class="bcard">
+      <div class="bhead"><h2><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1E5FD8" stroke-width="2" stroke-linejoin="round"><path d="M4 21V4h9v17M13 9h7v12M2 21h20M7 8h3M7 12h3M7 16h3M16 13h1M16 17h1"/></svg>${esc(b.name)}</h2>
         <button class="x" data-act="close" aria-label="닫기">${ICON.x}</button></div>
-      <ul class="facts">
-        ${b.crowd ? `<li><span class="live warm">지금 ${esc(b.crowd.label)}</span><span class="quiet">${b.crowd.minutesAgo}분 전 확인</span></li>` : ""}
-        <li><span class="muted">있는 시설</span><span>${esc(fac) || "아직 등록된 시설이 없어요"}</span></li>
-        ${cafes ? `<li><span class="muted">식당</span><span>${esc(cafes)}</span></li>` : ""}
-      </ul>
-      <div class="acts"><button class="btn pri" data-act="open-page">건물 자세히 보기</button><button class="btn" data-act="report" data-id="${esc(b.id)}">제보하기</button></div>`;
+      ${sub.length ? `<p class="bsub">${sub.map(esc).join('<i class="dot"></i>')}</p>` : ""}
+      <ul class="fstack">${stack || `<li class="none"><span class="ftag">-</span><div class="fchips"><em>등록된 정보 없음</em></div></li>`}</ul>
+      <button class="bbtn" data-act="report" data-id="${esc(b.id)}" data-kind="edit">이 건물 정보 수정 제보</button>
+    </div>`;
   }
 
   /* ---------- 건물 페이지 (시트를 끝까지 올리면) ---------- */
@@ -488,7 +587,10 @@
       case "close": return closeBuilding(state.prevView?.kind === "list" ? "half" : "peek");
       case "open-page": return Sheet.set("full");
       case "back": return Sheet.set("half");
-      case "home-tab": state.homeTab = d.t; return renderSheet();
+      case "home-tab": state.homeTab = d.t; state.homeAll = false; state.calDay = null; return renderSheet();
+      case "home-all": state.homeAll = !state.homeAll; return renderSheet();
+      case "cal-move": state.calMonth = new Date(state.calMonth.getFullYear(), state.calMonth.getMonth() + Number(d.n), 1); state.calDay = null; return renderSheet();
+      case "cal-day": state.calDay = state.calDay === d.d ? null : d.d; return renderSheet();
       case "page-tab": state.pageTab = d.p; state.floorIdx = 0; renderSheet(); body.scrollTop = 0; return;
       case "floor": state.floorIdx = Number(d.f); return renderSheet();
       case "cafe-day": state.cafeDay = Number(d.d); return renderSheet();

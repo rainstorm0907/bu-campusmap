@@ -5,6 +5,7 @@
   --primary: #03c75a;
   --primary-dark: #00a04a;
   --primary-soft: #e9f9f0;
+  --blue: #1f5fd7; /* 팀원 화면(시트) 포인트 색 */
   --bg: #f8f9fb;
   --surface: #ffffff;
   --subtle: #f3f4f6;
@@ -136,18 +137,72 @@ h2 { margin: 0; }
 .meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
 .type { font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; }
 
-/* 학사일정 세 칸 */
-.cells { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); border-radius: 10px; margin: 12px 0 16px; overflow: hidden; }
-.cell { padding: 11px 11px 12px; border-left: 1px solid var(--soft); display: flex; flex-direction: column; gap: 3px; }
-.cell:first-child { border-left: 0; }
-.cell.now { background: var(--primary-soft); }
-.cell b { font-size: 14.5px; font-weight: 600; }
-.cell.now b { color: var(--primary-dark); }
-.cell > span:last-child { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+/* 곧 있을 일들 (팀원 화면) */
+.home-head { align-items: center; margin: 2px 0 12px; }
+.home-head h2 { font-size: 22px; font-weight: 800; letter-spacing: -.3px; }
+.etabs { display: flex; gap: 6px; margin-bottom: 18px; }
+.etabs button { padding: 6px 15px; border-radius: 999px; border: 1px solid #d9d9d6; background: var(--surface); font-size: 14px; color: #555; }
+.etabs button.on { background: var(--blue); border-color: var(--blue); color: #fff; font-weight: 700; }
+.etabs button.on.dark { background: var(--text); border-color: var(--text); }
+.head.sec { align-items: center; margin: 4px 0 10px; }
+.head.sec h3 { margin: 0; font-size: 16px; font-weight: 700; }
+.more { border: 0; background: none; padding: 0; font-size: 13px; color: var(--quiet); }
+.dcards { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; margin: 0 -20px 22px; padding: 0 20px; scroll-padding: 0 20px; scroll-snap-type: x mandatory; }
+.dcards::-webkit-scrollbar { display: none; }
+.dcard { flex: none; width: 34%; min-width: 112px; scroll-snap-align: start; }
+.dbox { height: 142px; border-radius: 12px; padding: 11px 11px 13px; display: flex; flex-direction: column; justify-content: space-between; }
+.dbox b { font-size: 15px; line-height: 1.32; font-weight: 700; word-break: keep-all; }
+.dday { align-self: flex-start; font-size: 12px; font-weight: 800; padding: 2px 9px; border-radius: 999px; background: #fff; color: var(--text); }
+.dday.hot { background: #e5484d; color: #fff; }
+.dcard small { display: block; margin-top: 6px; font-size: 12.5px; color: var(--muted); }
+.erows { list-style: none; margin: 0; padding: 0; border-top: 1px solid #e8e8e5; }
+.erows li { display: flex; align-items: center; gap: 12px; padding: 13px 0; border-bottom: 1px solid #e8e8e5; }
+.erows li > div { flex: 1; min-width: 0; }
+.erows .k { flex: none; width: 56px; font-size: 14px; color: #777; font-variant-numeric: tabular-nums; }
+.erows p { font-size: 15px; font-weight: 700; word-break: keep-all; }
+.erows small { display: block; font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+.erows li.past { opacity: .5; }
+.erows li.empty { display: block; border: 0; }
+.thumb { flex: none; width: 46px; height: 46px; border-radius: 8px; }
+.badge { flex: none; font-size: 13px; font-weight: 700; padding: 4px 11px; border-radius: 999px; background: #f0f0ed; color: #555; }
+.badge.blue { background: #e6eefc; color: var(--blue); }
+.badge.past { color: var(--quiet); font-weight: 500; }
+/* 학사 달력 */
+.cal { margin: 0 0 18px; }
+.cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.cal-head b { font-size: 18px; font-weight: 800; }
+.cal-head button { border: 0; background: none; font-size: 24px; line-height: 1; color: #555; width: 36px; height: 32px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 4px; text-align: center; }
+.cal-grid.wk span { font-size: 13px; color: #888; padding: 6px 0; }
+.cal-grid .sun { color: #d64545; }
+.cal-grid button { position: relative; justify-self: center; width: 36px; height: 36px; border: 0; border-radius: 50%; background: none; font-size: 15px; font-variant-numeric: tabular-nums; }
+.cal-grid button.today { background: var(--blue); color: #fff; font-weight: 700; }
+.cal-grid button.pick { box-shadow: inset 0 0 0 2px var(--blue); }
+.cal-grid button.today i { background: #fff; bottom: 4px; }
+.cal-grid button i { position: absolute; left: 50%; bottom: -3px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: var(--blue); }
 
-.seg, .ptabs { display: flex; gap: 18px; border-bottom: 1px solid var(--soft); margin: 0 -20px 4px; padding: 0 20px; }
-.seg button, .ptabs button { border: 0; background: none; padding: 9px 0; font-size: 14px; font-weight: 500; color: var(--quiet); }
-.seg button.on, .ptabs button.on { color: var(--text); font-weight: 600; box-shadow: inset 0 -2px 0 var(--primary); }
+/* 건물 요약 카드 (팀원 화면) */
+.bhead { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.bhead h2 { display: flex; align-items: center; gap: 9px; font-size: 24px; font-weight: 800; letter-spacing: -.3px; }
+.bhead h2 svg { flex: none; }
+.bhead .x { width: 34px; height: 34px; border: 0; background: #f0f0ed; }
+.bsub { margin: 4px 0 0; font-size: 14px; color: #666; display: flex; align-items: center; }
+.bsub .dot { width: 4px; height: 4px; border-radius: 50%; background: #c4c4c0; margin: 0 8px; }
+.fstack { list-style: none; padding: 0; margin: 18px 0 0; }
+.fstack li { display: flex; align-items: flex-start; gap: 14px; padding-bottom: 18px; }
+.ftag { position: relative; flex: none; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: #e9f0fc; color: var(--blue); font-size: 14px; font-weight: 800; }
+.fstack li.none .ftag { background: #f0f0ed; color: #999; font-size: 12px; }
+.fstack li { position: relative; }
+.fline { position: absolute; left: 20px; top: 46px; bottom: 4px; width: 2px; background: #e3e3df; }
+.fline.on { background: #cfdcf6; }
+.fchips { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; padding-top: 4px; min-height: 42px; align-content: flex-start; }
+.fchips span { padding: 5px 12px; border-radius: 999px; border: 1px solid #d6e2f8; background: #f5f8fe; color: #1d4fb4; font-size: 14px; font-weight: 600; }
+.fchips em { font-style: normal; color: #a3a3a0; font-size: 14px; padding-top: 6px; }
+.bbtn { width: 100%; margin-top: 2px; padding: 14px; border: 0; border-radius: 12px; background: var(--blue); color: #fff; font-size: 15.5px; font-weight: 700; }
+
+.ptabs { display: flex; gap: 18px; border-bottom: 1px solid var(--soft); margin: 0 -20px 4px; padding: 0 20px; }
+.ptabs button { border: 0; background: none; padding: 9px 0; font-size: 14px; font-weight: 500; color: var(--quiet); }
+.ptabs button.on { color: var(--text); font-weight: 600; box-shadow: inset 0 -2px 0 var(--primary); }
 
 /* 목록 줄 */
 .rows { list-style: none; margin: 0; padding: 0; }
