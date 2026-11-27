@@ -16,6 +16,13 @@ struct WebView: UIViewRepresentable {
         let config = WKWebViewConfiguration()
         // JS → 네이티브 위치 요청 브릿지 (web/js/app.js 의 requestLocation 참고)
         config.userContentController.add(context.coordinator, name: "campusLocation")
+        // 웹(js/api.js)에 API 서버 주소 전달 → window.CAMPUS_API_BASE
+        // remoteURL 로 서버에서 직접 열면 같은 주소를 쓰므로 넣지 않음
+        if AppConfig.remoteURL == nil, let api = AppConfig.apiBaseURL {
+            let escaped = api.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+            config.userContentController.addUserScript(WKUserScript(source: "window.CAMPUS_API_BASE = \"\(escaped)\";",
+                                                                    injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        }
 
         let map = NativeMap.makeIfAvailable()
         if let map {

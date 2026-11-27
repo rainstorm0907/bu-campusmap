@@ -28,6 +28,7 @@ const BUILDING_TYPES = {
   hall: ["#F59E0B", "공연장"],
   library: ["#0EA5E9", "도서관"],
   office: ["#64748B", "행정"],
+  dorm: ["#8B5CF6", "생활관"],
 };
 
 /** 층 하나: 층 이름, 시설 분류(FACILITY_TYPES 키, 분류 칩과 챗봇이 씀), 메모, 카드에 보일 이름들(없으면 시설 분류 이름) */
@@ -38,11 +39,11 @@ const BUILDINGS = [
   { id: "johyung", name: "조형관", lat: 36.840894, lng: 127.188438, type: "art", floors: [fl("1층", ["cafe"]), fl("2층", ["restroom"])] },
   { id: "mokyang", name: "목양관", lat: 36.840874, lng: 127.183654, type: "lecture", floors: [fl("1층", ["atm", "restroom"]), fl("2층", ["printer"])] },
   { id: "bokji", name: "학생복지관", aliases: ["복지관"], lat: 36.840597, lng: 127.182496, type: "food",
-    floors: [fl("지하 1층", ["convenience"], "편의점 08:00~22:00"), fl("1층", ["cafe", "lounge"], "학생식당"), fl("2층", ["printer", "restroom"])],
+    floors: [fl("지하 1층", ["convenience"], "편의점 08:00~22:00", ["편의점", "밀겨울"]), fl("1층", ["cafe", "lounge"]), fl("2층", ["printer", "restroom"])],
     crowd: { label: "조금 붐벼요", minutesAgo: 5, confirms: 7 } },
   { id: "jinri", name: "진리관", lat: 36.840169, lng: 127.184518, type: "lecture", levels: [5, 1], elevator: false,
-    floors: [fl("1층", ["atm"], "", ["서점", "문구점", "신한은행", "우편취급국", "보건실"]), fl("지하 1층", ["convenience"], "", ["편의점"])] },
-  { id: "gyosu", name: "교수회관", lat: 36.839697, lng: 127.184804, type: "office", floors: [fl("1층", ["restroom"])] },
+    floors: [fl("1층", [], "", ["서점", "문구점", "신한은행", "우편취급국", "보건실"]), fl("지하 1층", ["convenience"], "", ["편의점"])] },
+  { id: "gyosu", name: "교수회관", lat: 36.839697, lng: 127.184804, type: "office", floors: [fl("1층", ["restroom"], "", ["교수회관 식당"])] },
   { id: "baekseokhall", name: "백석홀", lat: 36.839572, lng: 127.182658, type: "hall", floors: [fl("1층", ["cafe", "restroom"])] },
   { id: "insung", name: "인성관", lat: 36.839405, lng: 127.183558, type: "lecture", floors: [fl("1층", ["printer"]), fl("2층", ["lounge", "water"])] },
   { id: "bonbu", name: "본부동", lat: 36.83934, lng: 127.185784, type: "office", floors: [fl("1층", ["atm", "restroom"], "학사지원팀"), fl("2층", ["water"])] },
@@ -57,7 +58,9 @@ const BUILDINGS = [
   { id: "library", name: "백석학술정보관", aliases: ["도서관", "학술정보관"], lat: 36.837766, lng: 127.184041, type: "library",
     floors: [fl("1층", ["cafe", "printer", "water"], "대출, 반납"), fl("3층", ["lounge", "restroom"], "열람실")] },
   { id: "global", name: "글로벌 외식산업관", aliases: ["외식산업관"], lat: 36.837551, lng: 127.185125, type: "food",
-    floors: [fl("1층", ["convenience", "atm"], "푸드코트"), fl("2층", ["cafe"])] },
+    floors: [fl("1층", ["convenience", "atm"], "", ["안골식당"]), fl("2층", ["cafe"])] },
+  { id: "dorm", name: "백석생활관", aliases: ["생활관", "기숙사"], lat: 36.842568, lng: 127.185143, type: "dorm",
+    floors: [fl("1층", [], "", ["백석생활관 식당"])] },
   { id: "changjo", name: "창조관", lat: 36.837402, lng: 127.182419, type: "lecture", floors: [fl("1층", ["atm"]), fl("4층", ["printer", "lounge"], "실습실")] },
 ];
 
@@ -89,41 +92,51 @@ const EVENTS = [
 
 /**
  * 학식 데이터
+ * - 식당 이름, 층, 운영시간은 2번(데이터 담당) 자료. 가격은 아직 없음.
+ * - 메뉴: 서버가 켜져 있으면 서버가 날짜마다 채운 메뉴(server/menu_auto.py), 서버가 없으면 아래 예시.
+ *   지금은 점심만 운영하는 것으로 잡혀 있음.
  * - weeklyMenu 키: 1(월) ~ 5(금). 주말은 미운영.
  * - hours: "HH:MM ~ HH:MM" 를 "/" 로 구분
  */
 const CAFETERIAS = [
   {
-    id: "c1", name: "학생식당", buildingId: "bokji", floor: "1층",
-    hours: "11:00 ~ 14:00 / 17:00 ~ 19:00", price: "5,500원",
+    id: "c1", name: "백석생활관 식당", buildingId: "dorm", floor: "1층", hours: "11:00 ~ 18:00", price: "",
     weeklyMenu: {
-      1: { lunch: ["제육볶음", "된장국", "계란말이", "김치"], dinner: ["돈까스", "우동", "단무지"] },
-      2: { lunch: ["치킨마요덮밥", "미소국", "샐러드"], dinner: ["김치찌개", "계란후라이", "어묵볶음"] },
-      3: { lunch: ["순두부찌개", "고등어구이", "시금치나물"], dinner: ["짜장면", "탕수육", "단무지"] },
-      4: { lunch: ["닭갈비", "콩나물국", "감자조림"], dinner: ["카레라이스", "유부장국", "깍두기"] },
-      5: { lunch: ["불고기비빔밥", "북엇국", "김치전"], dinner: [] },
+      1: { lunch: ["쌀밥", "육개장", "마파두부", "감자조림", "메추리알장조림", "배추김치"] },
+      2: { lunch: ["흑미밥", "된장국", "고등어구이", "어묵볶음", "두부조림", "열무김치"] },
+      3: { lunch: ["쌀밥", "북엇국", "닭볶음탕", "메추리알장조림", "샐러드", "단무지"] },
+      4: { lunch: ["쌀밥", "떡국", "닭갈비", "감자조림", "두부조림", "총각김치"] },
+      5: { lunch: ["보리밥", "어묵국", "마파두부", "잡채", "멸치볶음", "단무지"] },
     },
   },
   {
-    id: "c2", name: "교직원식당", buildingId: "bonbu", floor: "2층",
-    hours: "11:30 ~ 13:30", price: "7,000원",
+    id: "c2", name: "교수회관 식당", buildingId: "gyosu", floor: "1층", hours: "08:30 ~ 17:00", price: "",
     weeklyMenu: {
-      1: { lunch: ["비빔밥", "미역국", "잡채", "깍두기"], dinner: [] },
-      2: { lunch: ["갈비탕", "도라지무침", "김치"], dinner: [] },
-      3: { lunch: ["생선까스", "크림스프", "코울슬로"], dinner: [] },
-      4: { lunch: ["육개장", "두부조림", "멸치볶음"], dinner: [] },
-      5: { lunch: ["떡갈비", "된장찌개", "오이무침"], dinner: [] },
+      1: { lunch: ["흑미밥", "순두부찌개", "제육볶음", "오이무침", "샐러드", "깍두기"] },
+      2: { lunch: ["잡곡밥", "미역국", "갈비찜", "어묵볶음", "메추리알장조림", "열무김치"] },
+      3: { lunch: ["기장밥", "떡국", "함박스테이크", "시금치나물", "오이무침", "총각김치"] },
+      4: { lunch: ["기장밥", "미역국", "생선까스", "도라지무침", "멸치볶음", "열무김치"] },
+      5: { lunch: ["기장밥", "청국장", "제육볶음", "콩나물무침", "계란말이", "총각김치"] },
     },
   },
   {
-    id: "c3", name: "푸드코트", buildingId: "global", floor: "1층",
-    hours: "10:30 ~ 19:30", price: "4,500~6,500원",
+    id: "c3", name: "안골식당", buildingId: "global", floor: "1층", hours: "10:30 ~ 14:00", price: "",
     weeklyMenu: {
-      1: { lunch: ["라면", "김밥", "돈까스"], dinner: ["라면", "김밥", "쫄면"] },
-      2: { lunch: ["라면", "김밥", "제육덮밥"], dinner: ["라면", "김밥", "떡볶이"] },
-      3: { lunch: ["라면", "김밥", "오므라이스"], dinner: ["라면", "김밥", "비빔국수"] },
-      4: { lunch: ["라면", "김밥", "치즈돈까스"], dinner: ["라면", "김밥", "만두"] },
-      5: { lunch: ["라면", "김밥", "참치마요"], dinner: ["라면", "김밥"] },
+      1: { lunch: ["흑미밥", "소고기무국", "함박스테이크", "콩나물무침", "메추리알장조림", "단무지"] },
+      2: { lunch: ["흑미밥", "순두부찌개", "카레", "메추리알장조림", "시금치나물", "단무지"] },
+      3: { lunch: ["보리밥", "소고기무국", "훈제오리", "잡채", "숙주나물", "배추김치"] },
+      4: { lunch: ["잡곡밥", "감자국", "돈까스", "콩나물무침", "메추리알장조림", "깍두기"] },
+      5: { lunch: ["흑미밥", "부대찌개", "오징어볶음", "떡볶이", "두부조림", "총각김치"] },
+    },
+  },
+  {
+    id: "c4", name: "밀겨울", buildingId: "bokji", floor: "지하 1층", hours: "08:30 ~ 17:00", price: "",
+    weeklyMenu: {
+      1: { lunch: ["쌀밥", "김치찌개", "생선까스", "시금치나물", "두부조림", "단무지"] },
+      2: { lunch: ["기장밥", "부대찌개", "제육볶음", "시금치나물", "메추리알장조림", "단무지"] },
+      3: { lunch: ["쌀밥", "김치찌개", "오징어볶음", "콩나물무침", "두부조림", "깍두기"] },
+      4: { lunch: ["잡곡밥", "소고기무국", "갈비찜", "계란말이", "메추리알장조림", "단무지"] },
+      5: { lunch: ["흑미밥", "콩나물국", "갈비찜", "도라지무침", "계란말이", "깍두기"] },
     },
   },
 ];

@@ -4,3 +4,8 @@ DerivedData/
 dd*/
 *.xcuserstate
 ios/Config/Secrets.xcconfig
+__pycache__/
+*.pyc
+.env
+server/campus.db
+server/uploads/

@@ -7,27 +7,40 @@
 | 폴더 | 내용 |
 |---|---|
 | `web/` | 화면 전부 (HTML/CSS/JS). 브라우저와 iOS 앱이 같이 씀 |
-| `ios/` | `web/` 을 띄우는 iOS 앱 (SwiftUI + WKWebView) |
+| `ios/` | `web/` 을 띄우는 iOS 앱 (SwiftUI + WKWebView, 아래에 네이버 3D 지도) |
+| `server/` | 데이터 저장과 API (Flask + SQLite). 관리자 로그인, 학식 메뉴, 제보, 분실물, 챗봇. 자세한 건 `server/README.md` |
 
 `web/js` 안:
 
 - `app.js` 화면 흐름 (하단 시트: 학사일정 홈, 목록, 건물 요약, 건물 페이지), 학식, 제보, 챗봇 연결
 - `map.js` 지도. 네이버 지도 키가 있으면 네이버 지도, 없으면 캠퍼스 모양을 그린 임시 지도
-- `data.js` 건물·학사일정·공지 데이터. 건물 좌표는 OpenStreetMap 실제 위치, 종류·시설·혼잡도·평가는 예시값
+- `data.js` 건물·식당·일정 데이터. 서버가 꺼져 있을 때 이 값으로 동작해요. 건물 좌표는 OpenStreetMap 실제 위치, 식당은 데이터 담당 자료, 시설·혼잡도·평가는 예시값
 - `campus-shapes.js` 임시 지도용 캠퍼스 윤곽 (OpenStreetMap)
 - `config.js` 네이버 지도 키 넣는 곳
 
 ## 실행
 
-브라우저:
+서버 (화면까지 같이 열려요):
+
+```sh
+cd server
+pip install -r requirements.txt
+python seed.py          # 처음 한 번: DB 만들기 + 건물·식당·메뉴 + 관리자 계정(admin / admin1234)
+python app.py           # http://localhost:8000
+```
+
+- DB 구조(`server/schema.sql`)가 바뀐 걸 받았으면 `python seed.py --reset` 으로 다시 만들어요.
+- 학식 메뉴는 서버가 날짜가 바뀔 때마다 이번 주 빈 칸을 채워요 (`server/menu_auto.py`). 실제 메뉴를 가져오는 방법이 정해지면 그 파일의 `fetch_menus()` 만 바꾸면 돼요.
+
+서버 없이 화면만 (예시 데이터로 동작):
 
 ```sh
 cd web
-python3 -m http.server 8000
-# http://localhost:8000
+python3 -m http.server 8765
+# http://localhost:8765
 ```
 
-iOS 앱: `ios/CampusMap.xcodeproj` 를 Xcode 로 열고 시뮬레이터에서 실행. 앱 안에 `web/` 폴더가 그대로 들어가요.
+iOS 앱: `ios/CampusMap.xcodeproj` 를 Xcode 로 열고 시뮬레이터에서 실행. 앱 안에 `web/` 폴더가 그대로 들어가요. 내 맥에서 서버가 켜져 있으면 앱이 그 서버(`http://localhost:8000`, `ios/CampusMap/AppConfig.swift`)를 써요. 꺼져 있으면 예시 데이터로 동작해요.
 
 ## 네이버 지도 키
 

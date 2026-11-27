@@ -207,7 +207,7 @@ enum MarkerArt {
     private static var cache: [String: NMFOverlayImage] = [:]
     private static let symbols = [
         "lecture": "graduationcap.fill", "food": "fork.knife", "sport": "figure.run", "art": "paintpalette.fill",
-        "hall": "music.note", "library": "book.fill", "office": "building.2.fill",
+        "hall": "music.note", "library": "book.fill", "office": "building.2.fill", "dorm": "bed.double.fill",
     ]
 
     static func dot(color: String, type: String, selected: Bool) -> NMFOverlayImage {

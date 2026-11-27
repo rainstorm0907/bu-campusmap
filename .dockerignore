@@ -1,0 +1,4 @@
+ios/
+server/campus.db
+server/uploads/
+**/__pycache__

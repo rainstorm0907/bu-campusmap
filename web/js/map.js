@@ -48,6 +48,7 @@ const CampusMap = (() => {
     hall: "M9 3v10.6A4 4 0 1 0 11 17V7h6V3z",
     library: "M4 4h6a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4zM20 4h-6a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z",
     office: "M4 21V5l8-3 8 3v16h-6v-5h-4v5zM8 8h2v2H8zm6 0h2v2h-2zm-6 4h2v2H8zm6 0h2v2h-2z",
+    dorm: "M2 19V6h2v8h7V8h7a4 4 0 0 1 4 4v7h-2v-2H4v2zM7.5 13a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z",
   };
   const typeOf = (b) => (typeof BUILDING_TYPES !== "undefined" && BUILDING_TYPES[b.type]) || ["#4A7DFF", "건물"];
   const glyph = (t) => GLYPH[t] || GLYPH.lecture;

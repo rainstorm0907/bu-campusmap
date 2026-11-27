@@ -406,7 +406,7 @@
     const rows = floorStack(b);
     const stack = rows.map((r, i) => {
       const tag = r.hi === r.lo ? floorTag(r.hi) : `${floorTag(r.lo)}–${floorTag(r.hi)}`.replace(/^(\d+)F–/, "$1–");
-      const names = r.f ? (r.f.places || r.f.facilities.map((t) => FACILITY_TYPES[t] || t)) : [];
+      const names = r.f ? [...new Set([...(r.f.places || []), ...r.f.facilities.map((t) => FACILITY_TYPES[t] || t)])] : [];
       const next = rows[i + 1];
       const line = next ? `<i class="fline${r.f && next.f ? " on" : ""}"></i>` : "";
       return `<li class="${r.f ? "" : "none"}">${line}<span class="ftag">${tag}</span>
