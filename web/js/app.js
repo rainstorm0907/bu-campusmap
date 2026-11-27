@@ -122,6 +122,7 @@
    * ============================================================ */
   const sheet = $("#sheet");
   const body = $("#sheetBody");
+  /** 넓은 화면(PC): 시트가 왼쪽 열에 있어 지도를 아래가 아니라 왼쪽에서 가린다. 시트 동작은 폰과 같다 */
   const isDesktop = () => window.matchMedia("(min-width: 769px)").matches;
   const Sheet = {
     st: "half",
@@ -140,10 +141,8 @@
       if (state.view.kind === "summary" && s === "full") { state.view = { kind: "page", id: state.view.id }; state.pageTab = "home"; renderSheet(); body.scrollTop = 0; }
       else if (state.view.kind === "page" && s !== "full") { state.view = { kind: "summary", id: state.view.id }; renderSheet(); }
       sheet.dataset.state = s;
-      if (isDesktop()) { sheet.style.transform = ""; placeFabs(); return; }
       sheet.style.transform = `translateY(${this.pos(s)}px)`;
       placeFabs();
-      sheet.dataset.state = s;
     },
     visible() { return isDesktop() ? 0 : this.H() - this.pos(this.st); },
   };
@@ -163,7 +162,6 @@
     const grab = $("#grab");
     let y0 = null, t0 = 0;
     grab.addEventListener("pointerdown", (e) => {
-      if (isDesktop()) return;
       y0 = e.clientY; t0 = Sheet.pos(Sheet.st);
       sheet.classList.add("drag");
       grab.setPointerCapture(e.pointerId);
@@ -477,7 +475,7 @@
   function render() {
     renderSheet();
     renderCats();
-    if (!isDesktop()) sheet.style.transform = `translateY(${Sheet.pos(Sheet.st)}px)`;
+    sheet.style.transform = `translateY(${Sheet.pos(Sheet.st)}px)`;
     placeFabs();
   }
 

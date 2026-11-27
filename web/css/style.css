@@ -312,13 +312,11 @@ dialog input, dialog select, dialog textarea { padding: 9px 10px; border: 1px so
 .chat-input { display: flex; gap: 6px; padding: 10px 12px calc(10px + var(--sab-env)); }
 .chat-input input { flex: 1; min-width: 0; padding: 9px 14px; border: 1px solid var(--line); border-radius: 999px; outline: none; font-size: 16px; }
 
-/* ---------- 넓은 화면 (PC): 시트를 왼쪽 패널로 ---------- */
+/* ---------- 넓은 화면 (PC): 폰과 같은 시트를 왼쪽 열에 ---------- */
 @media (min-width: 769px) {
   .top { right: auto; width: 400px; left: 16px; top: 16px; }
-  .sheet { left: 16px; right: auto; width: 400px; top: 136px; bottom: 16px; height: auto; border-radius: 16px; border: 1px solid var(--soft); transform: none !important; }
-  .grab { display: none; }
-  .sheet-body { padding-top: 14px; padding-bottom: 90px; }
-  .fixbtn { left: 32px; right: auto; width: 368px; bottom: 32px; }
+  .sheet { left: 16px; right: auto; width: 400px; height: calc(100% - 16px); border: 1px solid var(--soft); border-bottom: 0; }
+  .fixbtn { left: 32px; right: auto; width: 368px; }
   .chat { left: auto; right: 20px; bottom: 20px; width: 380px; height: min(600px, calc(100vh - 40px)); border-radius: 16px; }
   .map-placeholder .notice { left: auto; right: 16px; top: 16px; }
 }
