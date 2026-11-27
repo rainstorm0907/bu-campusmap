@@ -160,14 +160,28 @@ final class NativeMap: NSObject, WKScriptMessageHandler, NMFMapViewTouchDelegate
         for t in targets {
             guard let lat = t["lat"] as? Double, let lng = t["lng"] as? Double else { continue }
             let b = NMGLatLng(lat: lat, lng: lng)
-            if let line = NMFPolylineOverlay([a, b]) {
+            // path 가 오면 걷는 길을 따라 굵은 파란 선, 아니면 점선 직선
+            let path = (t["path"] as? [[String: Any]])?.compactMap { p -> NMGLatLng? in
+                guard let la = p["lat"] as? Double, let ln = p["lng"] as? Double else { return nil }
+                return NMGLatLng(lat: la, lng: ln)
+            } ?? []
+            var labelPos = NMGLatLng(lat: (a.lat + b.lat) / 2, lng: (a.lng + b.lng) / 2)
+            if path.count >= 2, let line = NMFPolylineOverlay(path) {
+                line.color = UIColor(hex: "#1F5FD7")
+                line.width = 6
+                line.capType = .round
+                line.joinType = .round
+                line.mapView = view
+                lineOverlays.append(line)
+                labelPos = path[path.count / 2]
+            } else if let line = NMFPolylineOverlay([a, b]) {
                 line.color = UIColor(hex: "#FF7A2F")
                 line.width = 3
                 line.pattern = [6, 5]
                 line.mapView = view
                 lineOverlays.append(line)
             }
-            let label = NMFMarker(position: NMGLatLng(lat: (a.lat + b.lat) / 2, lng: (a.lng + b.lng) / 2))
+            let label = NMFMarker(position: labelPos)
             label.iconImage = MarkerArt.empty
             label.captionText = t["label"] as? String ?? ""
             label.captionAligns = [NMFAlignType.center]

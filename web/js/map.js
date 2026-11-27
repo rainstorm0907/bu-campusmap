@@ -16,7 +16,8 @@
  *    CampusMap.isReady()                        네이버 지도(웹 또는 앱) 사용 여부
  *    CampusMap.setUserLocation(pos)             내 위치 표시 ({lat,lng} 또는 null)
  *    CampusMap.showDistanceLines(from, targets) 내 위치 → 식당 연결선 + 거리 라벨
- *        targets: [{ building, label }]  (빈 배열이면 선 지우기)
+ *        targets: [{ building, label, path? }]  (빈 배열이면 선 지우기)
+ *        path: [{lat,lng}] 를 주면 직선 대신 그 길을 따라 그림 (걷는 길 안내)
  *
  *  building 객체 형태: { id, name, lat, lng, type, ... }  (js/data.js 참고)
  *
@@ -207,7 +208,8 @@ const CampusMap = (() => {
     function setUserLocation(pos) { post({ cmd: "user", pos: pos ? { lat: pos.lat, lng: pos.lng } : null }); }
     function showDistanceLines(from, targets) {
       post({ cmd: "lines", from: from ? { lat: from.lat, lng: from.lng } : null,
-        targets: from ? targets.map(({ building, label }) => ({ lat: building.lat, lng: building.lng, label })) : [] });
+        targets: from ? targets.map(({ building, label, path }) => ({ lat: building.lat, lng: building.lng, label,
+          ...(path && { path: path.map((p) => ({ lat: p.lat, lng: p.lng })) }) })) : [] });
     }
     return { init, destroy, setMarkers, focus, setUserLocation, showDistanceLines };
   })();
@@ -261,9 +263,9 @@ const CampusMap = (() => {
     }
     function showDistanceLines(from, targets) {
       lines.forEach((l) => l.setMap(null));
-      lines = from ? targets.map(({ building }) => new naver.maps.Polyline({
-        map, path: [LL(from), LL(building)], strokeColor: "#FF7A2F", strokeWeight: 3, strokeStyle: "shortdash",
-      })) : [];
+      lines = from ? targets.map(({ building, path }) => new naver.maps.Polyline(path
+        ? { map, path: path.map(LL), strokeColor: "#1F5FD7", strokeWeight: 6, strokeOpacity: 0.85, strokeLineCap: "round", strokeLineJoin: "round" }
+        : { map, path: [LL(from), LL(building)], strokeColor: "#FF7A2F", strokeWeight: 3, strokeStyle: "shortdash" })) : [];
     }
     return { init, destroy, setMarkers, focus, setUserLocation, showDistanceLines };
   })();
@@ -462,15 +464,25 @@ const CampusMap = (() => {
       lastLines = [from, targets];
       svg.innerHTML = "";
       if (!from) return;
-      targets.forEach(({ building, label }) => {
+      targets.forEach(({ building, label, path }) => {
         const a = xy(from), b = xy(building);
-        const line = document.createElementNS(SVG_NS, "line");
-        line.setAttribute("x1", a.x); line.setAttribute("y1", a.y);
-        line.setAttribute("x2", b.x); line.setAttribute("y2", b.y);
-        svg.appendChild(line);
+        let mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        if (path) {
+          const pts = path.map(xy);
+          const line = document.createElementNS(SVG_NS, "polyline");
+          line.setAttribute("points", pts.map((p) => `${p.x},${p.y}`).join(" "));
+          line.setAttribute("class", "walk");
+          svg.appendChild(line);
+          mid = pts[Math.floor(pts.length / 2)];
+        } else {
+          const line = document.createElementNS(SVG_NS, "line");
+          line.setAttribute("x1", a.x); line.setAttribute("y1", a.y);
+          line.setAttribute("x2", b.x); line.setAttribute("y2", b.y);
+          svg.appendChild(line);
+        }
         const text = document.createElementNS(SVG_NS, "text");
-        text.setAttribute("x", (a.x + b.x) / 2);
-        text.setAttribute("y", (a.y + b.y) / 2 - 4);
+        text.setAttribute("x", mid.x);
+        text.setAttribute("y", mid.y - 6);
         text.textContent = label;
         svg.appendChild(text);
       });

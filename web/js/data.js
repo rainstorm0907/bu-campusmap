@@ -36,19 +36,19 @@ const fl = (floor, facilities, note = "", places) => ({ floor, facilities, note,
 const BUILDINGS = [
   { id: "seungri", name: "승리관", lat: 36.841763, lng: 127.185758, type: "lecture", floors: [fl("1층", ["printer", "restroom"]), fl("2층", ["water"])] },
   { id: "gym", name: "체육관", lat: 36.841366, lng: 127.187434, type: "sport", floors: [fl("1층", ["restroom", "water"])] },
-  { id: "johyung", name: "조형관", lat: 36.840894, lng: 127.188438, type: "art", floors: [fl("1층", ["cafe"]), fl("2층", ["restroom"])] },
-  { id: "mokyang", name: "목양관", lat: 36.840874, lng: 127.183654, type: "lecture", floors: [fl("1층", ["atm", "restroom"]), fl("2층", ["printer"])] },
+  { id: "johyung", name: "조형관", lat: 36.840894, lng: 127.188438, type: "art", floors: [fl("1층", ["cafe", "convenience"], "", ["CU"]), fl("2층", ["restroom"])] },
+  { id: "mokyang", name: "목양관", lat: 36.840874, lng: 127.183654, type: "lecture", floors: [fl("1층", ["restroom"]), fl("2층", ["printer"])] },
   { id: "bokji", name: "학생복지관", aliases: ["복지관"], lat: 36.840597, lng: 127.182496, type: "food",
-    floors: [fl("지하 1층", ["convenience"], "편의점 08:00~22:00", ["편의점", "밀겨울"]), fl("1층", ["cafe", "lounge"]), fl("2층", ["printer", "restroom"])],
+    floors: [fl("지하 1층", [], "", ["밀겨울"]), fl("1층", ["cafe", "lounge"]), fl("2층", ["convenience", "printer", "restroom"], "", ["세븐일레븐"])],
     crowd: { label: "조금 붐벼요", minutesAgo: 5, confirms: 7 } },
   { id: "jinri", name: "진리관", lat: 36.840169, lng: 127.184518, type: "lecture", levels: [5, 1], elevator: false,
-    floors: [fl("1층", [], "", ["서점", "문구점", "신한은행", "우편취급국", "보건실"]), fl("지하 1층", ["convenience"], "", ["편의점"])] },
+    floors: [fl("1층", ["atm"], "", ["서점", "문구점", "신한은행", "우편취급국", "보건실"]), fl("지하 1층", ["convenience"], "", ["CU"])] },
   { id: "gyosu", name: "교수회관", lat: 36.839697, lng: 127.184804, type: "office", floors: [fl("1층", ["restroom"], "", ["교수회관 식당"])] },
   { id: "baekseokhall", name: "백석홀", lat: 36.839572, lng: 127.182658, type: "hall", floors: [fl("1층", ["cafe", "restroom"])] },
   { id: "insung", name: "인성관", lat: 36.839405, lng: 127.183558, type: "lecture", floors: [fl("1층", ["printer"]), fl("2층", ["lounge", "water"])] },
-  { id: "bonbu", name: "본부동", lat: 36.83934, lng: 127.185784, type: "office", floors: [fl("1층", ["atm", "restroom"], "학사지원팀"), fl("2층", ["water"])] },
+  { id: "bonbu", name: "본부동", lat: 36.83934, lng: 127.185784, type: "office", floors: [fl("1층", ["atm", "restroom"], "학사지원팀", ["신한은행 ATM"]), fl("2층", ["water"]), fl("6층", ["convenience"], "", ["CU"])] },
   { id: "jihye", name: "지혜관", lat: 36.838751, lng: 127.184338, type: "lecture",
-    floors: [fl("1층", ["printer", "cafe"]), fl("2층", ["convenience", "lounge"])],
+    floors: [fl("1층", ["printer", "cafe"]), fl("2층", ["convenience", "lounge"], "", ["CU"])],
     crowd: { label: "조금 붐벼요", minutesAgo: 5, confirms: 7 },
     issues: [{ facility: "printer", floor: "1층", count: 2, minutesAgo: 10 }],
     rating: { score: 4.1, parts: [["시설 상태", 4.2], ["깨끗함", 4.3], ["자리 여유", 2.6]],
@@ -58,10 +58,10 @@ const BUILDINGS = [
   { id: "library", name: "백석학술정보관", aliases: ["도서관", "학술정보관"], lat: 36.837766, lng: 127.184041, type: "library",
     floors: [fl("1층", ["cafe", "printer", "water"], "대출, 반납"), fl("3층", ["lounge", "restroom"], "열람실")] },
   { id: "global", name: "글로벌 외식산업관", aliases: ["외식산업관"], lat: 36.837551, lng: 127.185125, type: "food",
-    floors: [fl("1층", ["convenience", "atm"], "", ["안골식당"]), fl("2층", ["cafe"])] },
+    floors: [fl("1층", [], "", ["안골식당"]), fl("2층", ["cafe"])] },
   { id: "dorm", name: "백석생활관", aliases: ["생활관", "기숙사"], lat: 36.842568, lng: 127.185143, type: "dorm",
-    floors: [fl("1층", [], "", ["백석생활관 식당"])] },
-  { id: "changjo", name: "창조관", lat: 36.837402, lng: 127.182419, type: "lecture", floors: [fl("1층", ["atm"]), fl("4층", ["printer", "lounge"], "실습실")] },
+    floors: [fl("1층", [], "", ["백석생활관 식당"]), fl("2층", ["convenience"], "", ["GS25"])] },
+  { id: "changjo", name: "창조관", lat: 36.837402, lng: 127.182419, type: "lecture", floors: [fl("4층", ["printer", "lounge"], "실습실"), fl("8층", ["convenience"], "", ["GS25"])] },
 ];
 
 /**
@@ -139,6 +139,41 @@ const CAFETERIAS = [
       5: { lunch: ["흑미밥", "콩나물국", "갈비찜", "도라지무침", "계란말이", "깍두기"] },
     },
   },
+];
+
+/**
+ * 교내 편의점 (브랜드별)
+ * - brand: "CU" | "GS25" | "세븐일레븐" | "이마트24"
+ * - buildingId: 지도에 있는 건물. 지도에 없는 건물이면 비우고 building 에 이름만 적음
+ * - hours: 확인된 것만 (모르면 비워 둠 → 영업 중 표시 안 함)
+ * 2026-11-27 카카오맵 장소 정보 + 팀원 확인으로 정리. 지혜관 CU 는 카카오맵에 3층 309호로 나오지만 팀원 확인대로 2층.
+ * 건물 층 정보(BUILDINGS 의 floors)와 server/seed.py 에도 같은 위치가 들어 있어요.
+ */
+const CONVENIENCE_STORES = [
+  { brand: "CU", buildingId: "jinri", floor: "지하 1층", hours: "" },
+  { brand: "CU", buildingId: "jihye", floor: "2층", hours: "" },
+  { brand: "CU", buildingId: "bonbu", floor: "6층", hours: "" },
+  { brand: "CU", buildingId: "johyung", floor: "1층", hours: "" },
+  { brand: "GS25", buildingId: "dorm", floor: "2층", hours: "07:00 ~ 23:00" },
+  { brand: "GS25", buildingId: "changjo", floor: "8층", hours: "" },
+  { brand: "GS25", buildingId: "jayu", floor: "", hours: "" },
+  { brand: "세븐일레븐", buildingId: "bokji", floor: "2층", hours: "" },
+  { brand: "이마트24", buildingId: "", building: "은혜관", floor: "1층", hours: "" },
+];
+
+/**
+ * 교내 은행, ATM
+ * 2026-11-27 카카오맵 장소 정보로 정리. 층은 카카오맵에 나온 것만 (진리관 신한은행 출장소 1층).
+ */
+const ATMS = [
+  { bank: "신한은행", kind: "출장소", buildingId: "jinri", floor: "1층" },
+  { bank: "신한은행", kind: "ATM", buildingId: "jinri", floor: "" },
+  { bank: "신한은행", kind: "ATM", buildingId: "bonbu", floor: "" },
+  { bank: "신한은행", kind: "ATM", buildingId: "insung", floor: "" },
+  { bank: "신한은행", kind: "ATM", buildingId: "jayu", floor: "" },
+  { bank: "KB국민은행", kind: "ATM", buildingId: "jayu", floor: "" },
+  { bank: "신한은행", kind: "ATM", buildingId: "dorm", floor: "" },
+  { bank: "신한은행", kind: "ATM", buildingId: "bokji", floor: "" },
 ];
 
 const LOST_ITEMS = [

@@ -17,6 +17,19 @@ python app.py           # http://localhost:8000
 - iOS 시뮬레이터: `ios/CampusMap/AppConfig.swift`의 `apiBaseURL`이 기본값 `http://localhost:8000`이에요.
   실제 아이폰에서 테스트하려면 맥의 IP(예: `http://192.168.0.10:8000`)나 배포 주소로 바꿔야 해요.
 
+### 차량 이동 시간 (네이버 실시간 교통)
+
+길찾기 화면의 차량 시간은 `/api/route`가 네이버 Directions 5에 물어봐서 채워요 (`routing.py`).
+키가 없으면 화면은 직선거리로 계산한 예상값을 보여줘요.
+
+1. NCP 콘솔의 Maps Application(지도 키와 같은 것)에서 **Directions 5**를 켜요.
+2. `server/.env` 파일을 만들고 두 줄을 적어요. 이 파일은 깃에 올라가지 않아요.
+   ```
+   NAVER_MAP_KEY_ID=Client ID
+   NAVER_MAP_KEY=Client Secret
+   ```
+3. 서버를 다시 켜요. 확인: `http://localhost:8000/api/route?from=36.840169,127.184518&to=36.837766,127.184041`
+
 ## 2. 폴더 구조
 
 ```
@@ -27,6 +40,7 @@ server/
   schema.sql    테이블 정의
   seed.py       DB 생성 + 예시 데이터 (web/js/data.js와 같은 내용)
   chatbot.py    챗봇 기본 버전 → 4번이 교체
+  routing.py    차량 이동 시간 (네이버 Directions 5, 실시간 교통)
   menu_auto.py  학식 메뉴 자동 채우기 (2번 데이터 담당 작업을 옮김). 지금은 무작위 메뉴, 점심만
 ```
 
