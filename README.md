@@ -53,7 +53,8 @@ python app.py
 | 화면 흐름, 하단 시트, 건물 카드 | `web/js/app.js` |
 | 색, 글자, 간격 | `web/css/style.css` |
 | 지도, 마커 | `web/js/map.js` (앱의 3D 지도는 `ios/CampusMap/NativeMap.swift`) |
-| 건물, 식당, 일정 데이터 | `web/js/data.js`와 `server/seed.py` (같은 내용이라 둘 다 고칩니다) |
+| 건물, 식당 데이터 | `web/js/data.js`와 `server/seed.py` (같은 내용이라 둘 다 고칩니다) |
+| 곧 있을 일들 (학사, 동아리, 축제 일정) | `web/js/data.js`의 `EVENTS` |
 | 검색창, 챗봇 AI | `web/js/chatbot.js`, `server/chatbot.py` |
 | API, DB | `server/app.py`, `server/schema.sql` ([서버 문서](server/README.md)) |
 | 학식 메뉴 자동 채우기 | `server/menu_auto.py` |
