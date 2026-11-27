@@ -125,7 +125,7 @@ final class NativeMap: NSObject, WKScriptMessageHandler, NMFMapViewTouchDelegate
             m.iconImage = MarkerArt.dot(color: item["color"] as? String ?? "#4A7DFF", type: item["type"] as? String ?? "lecture", selected: selected)
             m.captionText = item["name"] as? String ?? ""
             m.captionTextSize = selected ? 14 : 12.5
-            m.captionColor = selected ? UIColor(hex: "#00A04A") : UIColor(hex: "#1D1D1F")
+            m.captionColor = selected ? UIColor(hex: "#174BB0") : UIColor(hex: "#1D1D1F")
             m.alpha = (item["dim"] as? Bool ?? false) ? 0.28 : 1
             m.zIndex = selected ? 20 : 10
             if m.mapView == nil { m.mapView = view }

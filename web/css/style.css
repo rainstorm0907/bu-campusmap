@@ -1,11 +1,10 @@
 /* 캠퍼스맵 화면
  * 지도 전체 + 위 검색창과 분류 + 아래 시트 (네이버 지도식)
- * 색은 포인트 초록 하나에 건물 종류별 색만 더한다. 넓은 면은 흰색과 밝은 회색 */
+ * 색은 포인트 파랑 하나(팀원 화면 색)에 건물 종류별 색만 더한다. 넓은 면은 흰색과 밝은 회색 */
 :root {
-  --primary: #03c75a;
-  --primary-dark: #00a04a;
-  --primary-soft: #e9f9f0;
-  --blue: #1f5fd7; /* 팀원 화면(시트) 포인트 색 */
+  --primary: #1f5fd7;
+  --primary-dark: #174bb0;
+  --primary-soft: #e9f0fc;
   --bg: #f8f9fb;
   --surface: #ffffff;
   --subtle: #f3f4f6;
@@ -145,7 +144,7 @@ html.native-map #map { display: none; }
 .home-head h2 { font-size: 22px; font-weight: 800; letter-spacing: -.3px; }
 .etabs { display: flex; gap: 6px; margin-bottom: 18px; }
 .etabs button { padding: 6px 15px; border-radius: 999px; border: 1px solid #d9d9d6; background: var(--surface); font-size: 14px; color: #555; }
-.etabs button.on { background: var(--blue); border-color: var(--blue); color: #fff; font-weight: 700; }
+.etabs button.on { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 700; }
 .etabs button.on.dark { background: var(--text); border-color: var(--text); }
 .head.sec { align-items: center; margin: 4px 0 10px; }
 .head.sec h3 { margin: 0; font-size: 16px; font-weight: 700; }
@@ -168,7 +167,7 @@ html.native-map #map { display: none; }
 .erows li.empty { display: block; border: 0; }
 .thumb { flex: none; width: 46px; height: 46px; border-radius: 8px; }
 .badge { flex: none; font-size: 13px; font-weight: 700; padding: 4px 11px; border-radius: 999px; background: #f0f0ed; color: #555; }
-.badge.blue { background: #e6eefc; color: var(--blue); }
+.badge.blue { background: #e6eefc; color: var(--primary); }
 .badge.past { color: var(--quiet); font-weight: 500; }
 /* 학사 달력 */
 .cal { margin: 0 0 18px; }
@@ -179,10 +178,10 @@ html.native-map #map { display: none; }
 .cal-grid.wk span { font-size: 13px; color: #888; padding: 6px 0; }
 .cal-grid .sun { color: #d64545; }
 .cal-grid button { position: relative; justify-self: center; width: 36px; height: 36px; border: 0; border-radius: 50%; background: none; font-size: 15px; font-variant-numeric: tabular-nums; }
-.cal-grid button.today { background: var(--blue); color: #fff; font-weight: 700; }
-.cal-grid button.pick { box-shadow: inset 0 0 0 2px var(--blue); }
+.cal-grid button.today { background: var(--primary); color: #fff; font-weight: 700; }
+.cal-grid button.pick { box-shadow: inset 0 0 0 2px var(--primary); }
 .cal-grid button.today i { background: #fff; bottom: 4px; }
-.cal-grid button i { position: absolute; left: 50%; bottom: -3px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: var(--blue); }
+.cal-grid button i { position: absolute; left: 50%; bottom: -3px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: var(--primary); }
 
 /* 건물 요약 카드 (팀원 화면) */
 .bhead { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
@@ -193,7 +192,7 @@ html.native-map #map { display: none; }
 .bsub .dot { width: 4px; height: 4px; border-radius: 50%; background: #c4c4c0; margin: 0 8px; }
 .fstack { list-style: none; padding: 0; margin: 18px 0 0; }
 .fstack li { display: flex; align-items: flex-start; gap: 14px; padding-bottom: 18px; }
-.ftag { position: relative; flex: none; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: #e9f0fc; color: var(--blue); font-size: 14px; font-weight: 800; }
+.ftag { position: relative; flex: none; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: #e9f0fc; color: var(--primary); font-size: 14px; font-weight: 800; }
 .fstack li.none .ftag { background: #f0f0ed; color: #999; font-size: 12px; }
 .fstack li { position: relative; }
 .fline { position: absolute; left: 20px; top: 46px; bottom: 4px; width: 2px; background: #e3e3df; }
@@ -201,7 +200,7 @@ html.native-map #map { display: none; }
 .fchips { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; padding-top: 4px; min-height: 42px; align-content: flex-start; }
 .fchips span { padding: 5px 12px; border-radius: 999px; border: 1px solid #d6e2f8; background: #f5f8fe; color: #1d4fb4; font-size: 14px; font-weight: 600; }
 .fchips em { font-style: normal; color: #a3a3a0; font-size: 14px; padding-top: 6px; }
-.bbtn { width: 100%; margin-top: 2px; padding: 14px; border: 0; border-radius: 12px; background: var(--blue); color: #fff; font-size: 15.5px; font-weight: 700; }
+.bbtn { width: 100%; margin-top: 2px; padding: 14px; border: 0; border-radius: 12px; background: var(--primary); color: #fff; font-size: 15.5px; font-weight: 700; }
 
 .ptabs { display: flex; gap: 18px; border-bottom: 1px solid var(--soft); margin: 0 -20px 4px; padding: 0 20px; }
 .ptabs button { border: 0; background: none; padding: 9px 0; font-size: 14px; font-weight: 500; color: var(--quiet); }

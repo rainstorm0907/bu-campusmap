@@ -712,7 +712,10 @@
     form.reset();
   });
 
-  /* -------------------- 검색 -------------------- */
+  /* -------------------- 검색 --------------------
+   * 지금은 건물·시설·분실물을 글자로 찾아 시트 목록에 보여준다.
+   * AI 를 붙이면 여기서 q 를 CampusBot.reply(q, ctx)(js/chatbot.js)로 넘기면 된다.
+   * 답에 buildingId 가 오면 selectBuilding(buildingById(id)) 로 지도에서 그 건물을 고를 수 있다. */
   $("#searchForm").addEventListener("submit", (e) => {
     e.preventDefault();
     const q = $("#searchInput").value.trim();

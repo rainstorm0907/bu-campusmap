@@ -56,7 +56,7 @@ const CampusMap = (() => {
   function markerHTML(b) {
     const on = selectedId === b.id;
     const dim = !on && dimmed && !dimmed.has(b.id);
-    const color = on ? "#03C75A" : typeOf(b)[0];
+    const color = on ? "#1F5FD7" : typeOf(b)[0];
     const size = on ? 17 : 13;
     return `<div class="mk${on ? " on" : ""}${dim ? " dim" : ""}" data-id="${esc(b.id)}">
       <span class="mk-dot" style="background:${color}"><svg width="${size}" height="${size}" viewBox="0 0 24 24"><path d="${glyph(b.type)}" fill="#fff" fill-rule="evenodd"/></svg></span>
@@ -192,7 +192,7 @@ const CampusMap = (() => {
       taps = Object.fromEntries(list.map((b) => [b.id, () => onClick(b)]));
       post({ cmd: "markers", list: list.map((b) => ({
         id: b.id, name: b.name, lat: b.lat, lng: b.lng, type: b.type || "lecture",
-        color: selectedId === b.id ? "#03C75A" : typeOf(b)[0], selected: selectedId === b.id, dim: selectedId !== b.id && !!(dimmed && !dimmed.has(b.id)),
+        color: selectedId === b.id ? "#1F5FD7" : typeOf(b)[0], selected: selectedId === b.id, dim: selectedId !== b.id && !!(dimmed && !dimmed.has(b.id)),
       })) });
       if (!fitted && list.length) {
         fitted = true;

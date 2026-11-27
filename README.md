@@ -49,3 +49,9 @@ iOS 앱: `ios/CampusMap.xcodeproj` 를 Xcode 로 열고 시뮬레이터에서 �
 2. `web/js/config.js` 의 `NAVER_MAP_KEY_ID` 에 Client ID 를 넣어요.
 
 웹 네이버 지도는 기울이기가 없어서 평면으로 보여요.
+
+## 검색창에 AI 붙이는 자리
+
+- 검색창 "무엇이든 물어보세요": `web/js/app.js` 의 검색 부분 (`searchForm` 제출). 지금은 건물·시설·분실물을 글자로 찾아요.
+- 답을 만드는 곳: `web/js/chatbot.js` 의 `CampusBot.reply(text, ctx)`. `{ text, buildingId? }` 를 돌려주면 돼요. `buildingId` 가 있으면 지도에서 그 건물로 갈 수 있어요.
+- AI API 키는 웹 코드에 넣지 말고 서버를 거쳐서 불러요. 웹 코드는 누구나 볼 수 있어요.
