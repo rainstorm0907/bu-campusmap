@@ -20,12 +20,16 @@ from pathlib import Path
 from flask import Flask, g, jsonify, request, send_from_directory
 from werkzeug.exceptions import HTTPException
 
+import hashlib
+
 import auth
 import chatbot
+import feedback
 import menu_auto
 import routing
-from db import (BASE_DIR, building_dict, cafeteria_dict, close_db, get_db, lost_dict, menu_dict,
+from db import (BASE_DIR, building_dict, cafeteria_dict, close_db, event_dict, get_db, lost_dict, menu_dict,
                 report_dict, save_building_floors)
+from ratelimit import RateLimiter
 
 WEB_DIR = BASE_DIR.parent / "web"
 UPLOAD_DIR = Path(os.environ.get("CAMPUS_UPLOADS", BASE_DIR / "uploads"))
@@ -365,6 +369,195 @@ def upsert_menus():
         saved += 1
     db.commit()
     return jsonify(ok=True, saved=saved)
+
+
+# ================================================================
+#  일정 (조회는 누구나, 수정은 관리자)
+# ================================================================
+
+EVENT_CATS = ("academic", "club", "festival", "event")
+
+
+def _event_values(data, cur=None):
+    """POST 는 전체, PUT 은 보낸 값만 바꿈 (cur: 기존 값)"""
+    cur = cur or {}
+    v = {
+        "cat": choice(data, "cat", EVENT_CATS) if "cat" in data or not cur else cur["cat"],
+        "title": text(data, "title", True, 100) if "title" in data or not cur else cur["title"],
+        "due": text(data, "due", max_len=30) if "due" in data else cur.get("due", ""),
+        "place": text(data, "place", max_len=100) if "place" in data else cur.get("place", ""),
+    }
+    for key, col in (("start", "start_date"), ("end", "end_date")):
+        if key in data:
+            v[col] = valid_date(data[key], key) if data[key] else None
+        else:
+            v[col] = cur.get(col)
+    if not (v["start_date"] or v["end_date"]):
+        raise ApiError("'start' 나 'end' 중 하나는 있어야 해요.")
+    if v["start_date"] and v["end_date"] and v["start_date"] > v["end_date"]:
+        raise ApiError("'start' 가 'end' 보다 늦어요.")
+    return v
+
+
+@app.get("/api/events")
+def list_events():
+    """?cat=academic  ?from=YYYY-MM-DD (그 날 이후 끝나는 일정만)"""
+    sql, args = "SELECT * FROM events WHERE 1=1", []
+    if request.args.get("cat"):
+        sql += " AND cat = ?"
+        args.append(choice(request.args, "cat", EVENT_CATS))
+    if request.args.get("from"):
+        sql += " AND COALESCE(end_date, start_date) >= ?"
+        args.append(valid_date(request.args["from"], "from"))
+    rows = get_db().execute(sql + " ORDER BY COALESCE(start_date, end_date), id", args).fetchall()
+    return jsonify([event_dict(r) for r in rows])
+
+
+@app.post("/api/events")
+@auth.admin_required
+def create_event():
+    v = _event_values(body())
+    db = get_db()
+    cur = db.execute("INSERT INTO events (cat, title, start_date, end_date, due, place) VALUES (?,?,?,?,?,?)",
+                     (v["cat"], v["title"], v["start_date"], v["end_date"], v["due"], v["place"]))
+    db.commit()
+    return jsonify(event_dict(db.execute("SELECT * FROM events WHERE id = ?", (cur.lastrowid,)).fetchone())), 201
+
+
+@app.put("/api/events/<int:eid>")
+@auth.admin_required
+def update_event(eid):
+    db = get_db()
+    row = db.execute("SELECT * FROM events WHERE id = ?", (eid,)).fetchone()
+    if not row:
+        raise ApiError("존재하지 않는 일정이에요.", 404)
+    v = _event_values(body(), dict(row))
+    db.execute("""UPDATE events SET cat=?, title=?, start_date=?, end_date=?, due=?, place=?,
+                  updated_at=datetime('now','localtime') WHERE id=?""",
+               (v["cat"], v["title"], v["start_date"], v["end_date"], v["due"], v["place"], eid))
+    db.commit()
+    return jsonify(event_dict(db.execute("SELECT * FROM events WHERE id = ?", (eid,)).fetchone()))
+
+
+@app.delete("/api/events/<int:eid>")
+@auth.admin_required
+def delete_event(eid):
+    db = get_db()
+    if db.execute("DELETE FROM events WHERE id = ?", (eid,)).rowcount == 0:
+        raise ApiError("존재하지 않는 일정이에요.", 404)
+    db.commit()
+    return jsonify(ok=True)
+
+
+# ================================================================
+#  학생 참여: 혼잡도 · 평가 (계산은 feedback.py)
+#  결과는 GET /api/buildings 의 crowd, rating 에도 같이 들어감
+# ================================================================
+
+crowd_limiter = RateLimiter(per_ip=(30, 60), total=(20000, 86400))
+review_limiter = RateLimiter(per_ip=(5, 3600), total=(2000, 86400))
+
+
+def client_ip():
+    # 배포 서비스(프록시) 뒤에서는 TRUST_PROXY=1 로 켜야 실제 사용자 IP 를 봄
+    if os.environ.get("TRUST_PROXY") == "1" and request.headers.get("X-Forwarded-For"):
+        return request.headers["X-Forwarded-For"].split(",")[0].strip()
+    return request.remote_addr or "unknown"
+
+
+def client_key():
+    """같은 사람인지 구분하는 값. IP 를 그대로 저장하지 않고 암호화해서 앞 16자리만 씀"""
+    raw = (app.config["SECRET_KEY"] + client_ip()).encode()
+    return hashlib.sha256(raw).hexdigest()[:16]
+
+
+def limited(limiter):
+    ok, retry = limiter.hit(client_ip())
+    if not ok:
+        res = jsonify(error="요청이 너무 많아요. 잠시 후 다시 시도해 주세요.")
+        res.headers["Retry-After"] = str(retry)
+        return res, 429
+    return None
+
+
+@app.post("/api/buildings/<bid>/crowd")
+def vote_crowd(bid):
+    """본문: { level: "busy" | "calm" } → { crowd }"""
+    building_exists(bid)
+    level = choice(body(), "level", ("busy", "calm"))
+    blocked = limited(crowd_limiter)
+    if blocked:
+        return blocked
+    db = get_db()
+    feedback.add_crowd_vote(db, bid, level, client_key())
+    db.commit()
+    return jsonify(crowd=feedback.crowd_summary(db, bid))
+
+
+@app.delete("/api/buildings/<bid>/crowd")
+@auth.admin_required
+def reset_crowd(bid):
+    building_exists(bid)
+    db = get_db()
+    n = db.execute("DELETE FROM crowd_votes WHERE building_id = ?", (bid,)).rowcount
+    db.commit()
+    return jsonify(ok=True, deleted=n)
+
+
+def _score(scores, key):
+    v = scores.get(key)
+    if isinstance(v, bool) or not isinstance(v, int) or not 1 <= v <= 5:
+        raise ApiError(f"'scores.{key}' 는 1~5 사이 정수여야 해요.")
+    return v
+
+
+@app.get("/api/buildings/<bid>/reviews")
+def building_reviews(bid):
+    building_exists(bid)
+    rows = get_db().execute("SELECT * FROM reviews WHERE building_id = ? ORDER BY id DESC", (bid,)).fetchall()
+    return jsonify([feedback.review_dict(r) for r in rows])
+
+
+@app.post("/api/buildings/<bid>/reviews")
+def create_review(bid):
+    """본문: { scores: {facility, clean, space} (1~5), text?: "한줄평" } → { review, rating }"""
+    building_exists(bid)
+    data = body()
+    scores = data.get("scores")
+    if not isinstance(scores, dict):
+        raise ApiError("'scores' 가 필요해요. 예: {\"facility\": 4, \"clean\": 5, \"space\": 3}")
+    vals = [_score(scores, k) for k, _ in feedback.REVIEW_PARTS]
+    review_text = text(data, "text", max_len=300)
+    blocked = limited(review_limiter)
+    if blocked:
+        return blocked
+    db = get_db()
+    cur = db.execute("INSERT INTO reviews (building_id, facility, clean, space, text, client) VALUES (?,?,?,?,?,?)",
+                     (bid, *vals, review_text, client_key()))
+    db.commit()
+    row = db.execute("SELECT * FROM reviews WHERE id = ?", (cur.lastrowid,)).fetchone()
+    return jsonify(review=feedback.review_dict(row), rating=feedback.rating_summary(db, bid)), 201
+
+
+@app.get("/api/reviews")
+@auth.admin_required
+def all_reviews():
+    """관리자 화면용 전체 평가 목록. ?buildingId= 로 거르기"""
+    sql, args = "SELECT * FROM reviews", []
+    if request.args.get("buildingId"):
+        sql += " WHERE building_id = ?"
+        args.append(request.args["buildingId"])
+    return jsonify([feedback.review_dict(r) for r in get_db().execute(sql + " ORDER BY id DESC", args)])
+
+
+@app.delete("/api/reviews/<int:rid>")
+@auth.admin_required
+def delete_review(rid):
+    db = get_db()
+    if db.execute("DELETE FROM reviews WHERE id = ?", (rid,)).rowcount == 0:
+        raise ApiError("존재하지 않는 평가예요.", 404)
+    db.commit()
+    return jsonify(ok=True)
 
 
 # ================================================================

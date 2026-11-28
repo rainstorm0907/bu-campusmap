@@ -39,6 +39,8 @@ server/
   auth.py       관리자 로그인 토큰, @admin_required
   schema.sql    테이블 정의
   seed.py       DB 생성 + 예시 데이터 (web/js/data.js와 같은 내용)
+  feedback.py   혼잡도·평가 계산
+  ratelimit.py  호출 횟수 제한 (혼잡도, 평가)
   chatbot.py    챗봇 기본 버전 → 4번이 교체
   routing.py    차량 이동 시간 (네이버 Directions 5, 실시간 교통)
   menu_auto.py  학식 메뉴 자동 채우기 (2번 데이터 담당 작업을 옮김). 지금은 무작위 메뉴, 점심만
@@ -56,6 +58,8 @@ erDiagram
   buildings ||--o{ lost_items : at
   buildings ||--o{ reports : about
   users ||--o{ reports : reviews
+  buildings ||--o{ crowd_votes : votes
+  buildings ||--o{ reviews : rated
 
   buildings { text id PK; text name; text aliases; real lat; real lng; text type; int levels_above; int levels_below; int elevator; text image_url }
   floors { int id PK; text building_id FK; text floor; text note; text places; int sort_order }
@@ -67,6 +71,9 @@ erDiagram
   reports { int id PK; text kind; text building_id FK; text floor; text content; text image_url; text status; text admin_note; int reviewed_by FK; text date }
   users { int id PK; text username; text password_hash; text role }
   chat_logs { int id PK; text message; text answer; text created_at }
+  events { int id PK; text cat; text title; text start_date; text end_date; text due; text place }
+  crowd_votes { int id PK; text building_id FK; text level; text client; text created_at }
+  reviews { int id PK; text building_id FK; int facility; int clean; int space; text text; text client; text created_at }
 ```
 
 설계 포인트:
@@ -75,6 +82,7 @@ erDiagram
 - **층별 시설은 다대다 구조예요** (`floors` ↔ `floor_facilities` ↔ `facility_types`). 카테고리 필터와 "프린터 어디?" 같은 챗봇 질문을 SQL 한 번으로 처리할 수 있어요.
 - **제보 상태값**: `pending`(검토 대기) → `done`(반영 완료) / `rejected`(반려). 2번의 승인 화면에서 바꿔요.
 - `chat_logs`: 4번이 자주 나오는 질문을 분석할 때 쓰도록 남겨둔 기록이에요.
+- **혼잡도와 평가는 누른 기록을 그대로 저장해요** (`crowd_votes`, `reviews`). 평균이나 "몇 명이 확인" 같은 값은 요청이 올 때마다 계산해요. 그래서 관리자가 평가 하나를 지우면 평균도 바로 바뀌어요.
 
 ## 4. API 명세
 
@@ -117,6 +125,68 @@ erDiagram
 | PUT 🔒 | `/api/menus` | `{menus: [{cafeteriaId, date, meal, items}]}` 여러 개를 한 번에 등록·수정. `items: []`를 보내면 삭제 |
 
 `meal`은 `breakfast`, `lunch`, `dinner` 중 하나예요 (현재 프론트는 점심과 저녁만 표시).
+
+### 일정
+
+조회는 누구나, 추가·수정·삭제는 관리자만 할 수 있어요. 처음 값은 `seed.py`의 `EVENTS`에서 들어가요 (`web/js/data.js`와 같은 내용).
+
+| 메서드 | 경로 | 보내는 값 → 받는 값 |
+|---|---|---|
+| GET | `/api/events?cat=academic&from=YYYY-MM-DD` | 일정 목록. `from`을 주면 그날 이후 끝나는 일정만 |
+| POST 🔒 | `/api/events` | `{cat, title, start?, end?, due?, place?}` → `event` (`start`나 `end` 중 하나는 필수) |
+| PUT 🔒 | `/api/events/:id` | 보낸 값만 수정 → `event` |
+| DELETE 🔒 | `/api/events/:id` | 삭제 → `{ok}` |
+
+```js
+// event: 값이 없는 키는 빠져서 와요
+{ id: 7, cat: "club",          // academic(학사) | club(동아리) | festival(축제) | event(교내 행사)
+  title: "동아리 박람회 사전 신청",
+  start: "2026-11-23",         // 시작일·하루짜리 (YYYY-MM-DD)
+  end: "2026-11-30",           // 마감일
+  due: "신청 마감",             // 마감 카드 문구
+  place: "학생회관 앞 광장 · 10:00" }
+```
+
+### 혼잡도 · 평가 (학생 참여)
+
+학생은 로그인 없이 누르고 쓸 수 있어요. 관리자는 초기화와 삭제만 해요.
+결과는 `GET /api/buildings`의 각 건물 안에 `crowd`, `rating`으로도 같이 와요. 없으면 키가 빠져요.
+
+| 메서드 | 경로 | 보내는 값 → 받는 값 |
+|---|---|---|
+| POST | `/api/buildings/:id/crowd` | `{level: "busy" \| "calm"}` → `{crowd}` |
+| DELETE 🔒 | `/api/buildings/:id/crowd` | 그 건물 혼잡도 초기화 → `{ok, deleted}` |
+| GET | `/api/buildings/:id/reviews` | 그 건물 평가 목록 → `[review]` |
+| POST | `/api/buildings/:id/reviews` | `{scores: {facility, clean, space}, text?}` → `{review, rating}` |
+| GET 🔒 | `/api/reviews?buildingId=` | 관리자 화면용 전체 평가 목록 → `[review]` |
+| DELETE 🔒 | `/api/reviews/:id` | 부적절한 평가 삭제 → `{ok}` |
+
+주고받는 데이터:
+
+```js
+// crowd: 최근 60분 동안 누른 것만 계산. 없으면 null
+{ level: "busy",            // busy(붐빔) | calm(한산)
+  label: "조금 붐벼요",       // 붐벼요 | 조금 붐벼요 | 한산해요
+  minutesAgo: 5,            // 마지막으로 누른 지 몇 분
+  confirms: 7,              // 지금 상태에 동의한 사람 수
+  votes: 9 }                // 전체 누른 사람 수
+
+// rating: 평가가 없으면 null
+{ score: 4.1, count: 12,    // 전체 평균, 평가 수
+  parts: [["시설 상태", 4.2], ["깨끗함", 4.3], ["자리 여유", 2.6]],
+  reviews: [["2026학년도 2학기, 3일 전", "콘센트가 많아요"]] }   // 한줄평 있는 것만, 최근 20개
+
+// review: 평가 하나 (관리자 목록에서 id 로 삭제)
+{ id: 3, buildingId: "jihye",
+  scores: { facility: 4, clean: 5, space: 2 },   // 각각 1~5 정수
+  text: "콘센트가 많아요", date: "2026-11-28", when: "2026학년도 2학기, 오늘" }
+```
+
+규칙:
+- **혼잡도**: 같은 사람이 같은 건물에서 10분 안에 다시 누르면 새로 세지 않고 이전 표를 바꿔요. 숫자를 부풀릴 수 없어요.
+- **평가**: 한 사람당 1시간에 5개까지 쓸 수 있어요. 넘으면 `429`가 와요.
+- 사람 구분은 IP를 암호화한 값으로만 하고, 원래 IP는 저장하지 않아요.
+- 고장 신고(`issues`)는 아직 DB에 없어서 화면이 `data.js`의 예시값을 써요.
 
 ### 분실물 (5번)
 
@@ -177,7 +247,7 @@ const { url } = await (await fetch(base + "/api/uploads", { method: "POST", body
 
 | 담당 | 쓰는 API |
 |---|---|
-| 2번 데이터·관리자 | `auth/login`, `PUT menus`, `POST/PUT buildings`, `GET/PATCH reports`, `PATCH/DELETE lost` |
+| 2번 데이터·관리자 | `auth/login`, `PUT menus`, `POST/PUT buildings`, `GET/PATCH reports`, `PATCH/DELETE lost`, `events` 추가/수정/삭제, `GET/DELETE reviews`, `DELETE buildings/:id/crowd` |
 | 3번 지도 | `GET buildings`, `GET facility-types` |
 | 4번 챗봇 | `POST chat`, `chatbot.py` 교체 (DB 직접 조회 가능) |
 | 5번 상세·제보 | `GET buildings/:id`, `GET menus`, `GET/POST lost`, `POST reports`, `POST uploads` |

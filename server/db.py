@@ -6,6 +6,8 @@ from pathlib import Path
 
 from flask import g
 
+import feedback
+
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = Path(os.environ.get("CAMPUS_DB", BASE_DIR / "campus.db"))
 
@@ -62,6 +64,13 @@ def building_dict(conn, row):
         out["levels"] = [row["levels_above"], row["levels_below"] or 0]
     if row["elevator"] is not None:
         out["elevator"] = bool(row["elevator"])
+    # 학생 참여 데이터 (없으면 키를 빼서 보냄)
+    crowd = feedback.crowd_summary(conn, row["id"])
+    if crowd:
+        out["crowd"] = crowd
+    rating = feedback.rating_summary(conn, row["id"])
+    if rating:
+        out["rating"] = rating
     return out
 
 
@@ -106,3 +115,10 @@ def save_building_floors(conn, building_id, floors):
         for key in f.get("facilities", []):
             conn.execute("INSERT OR IGNORE INTO floor_facilities (floor_id, facility_key) VALUES (?, ?)",
                          (cur.lastrowid, key))
+
+
+def event_dict(row):
+    """값이 없는 키는 빼고 보낸다 (화면은 없으면 표시하지 않음)"""
+    out = {"id": row["id"], "cat": row["cat"], "title": row["title"], "start": row["start_date"],
+           "end": row["end_date"], "due": row["due"], "place": row["place"]}
+    return {k: v for k, v in out.items() if v not in (None, "")}

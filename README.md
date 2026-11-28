@@ -58,7 +58,7 @@ Xcode에서 `ios/CampusMap.xcodeproj`를 열어 실행합니다. 같은 Mac에�
 | 색상, 글꼴, 간격 | `web/css/style.css` |
 | 지도, 마커 | `web/js/map.js`, iOS 3D 지도는 `ios/CampusMap/NativeMap.swift` |
 | 건물, 식당 데이터 | `web/js/data.js`, `server/seed.py` (동일한 내용이므로 함께 수정) |
-| 학사·동아리·축제 일정 | `web/js/data.js`의 `EVENTS` |
+| 학사·동아리·축제 일정 | 처음 값: `web/js/data.js`의 `EVENTS`와 `server/seed.py`의 `EVENTS` (함께 수정). 운영 중에는 관리자 API `/api/events` |
 | 검색창, 챗봇 AI | `web/js/chatbot.js`, `server/chatbot.py` |
 | API, DB | `server/app.py`, `server/schema.sql` ([서버 문서](server/README.md)) |
 | 학식 메뉴 자동 생성 | `server/menu_auto.py` |

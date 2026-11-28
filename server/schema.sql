@@ -111,3 +111,46 @@ CREATE TABLE IF NOT EXISTS chat_logs (
   answer     TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
+
+-- ================================================================
+--  일정 (관리자가 수정, 처음 값은 seed.py 의 EVENTS)
+-- ================================================================
+CREATE TABLE IF NOT EXISTS events (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  cat        TEXT NOT NULL CHECK (cat IN ('academic', 'club', 'festival', 'event')),
+  title      TEXT NOT NULL,
+  start_date TEXT,                           -- YYYY-MM-DD (하루짜리·시작일)
+  end_date   TEXT,                           -- YYYY-MM-DD (마감일)
+  due        TEXT NOT NULL DEFAULT '',       -- 마감 카드 문구: "신청 마감"
+  place      TEXT NOT NULL DEFAULT '',       -- 장소·시간
+  updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+  CHECK (start_date IS NOT NULL OR end_date IS NOT NULL)
+);
+CREATE INDEX IF NOT EXISTS idx_events_dates ON events(start_date, end_date);
+
+-- ================================================================
+--  학생 참여: 혼잡도 · 평가 (feedback.py 에서 계산)
+-- ================================================================
+
+-- "지금 붐벼요 / 한산해요" 누른 기록. 최근 60분 것만 화면에 반영
+CREATE TABLE IF NOT EXISTS crowd_votes (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  building_id TEXT NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
+  level       TEXT NOT NULL CHECK (level IN ('busy', 'calm')),
+  client      TEXT NOT NULL,                 -- 누른 사람 구분값 (IP 를 암호화한 값, 원래 IP 는 저장 안 함)
+  created_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+);
+CREATE INDEX IF NOT EXISTS idx_crowd_building_time ON crowd_votes(building_id, created_at);
+
+-- 건물 평가 (항목별 1~5점 + 한줄평)
+CREATE TABLE IF NOT EXISTS reviews (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  building_id TEXT    NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
+  facility    INTEGER NOT NULL CHECK (facility BETWEEN 1 AND 5),  -- 시설 상태
+  clean       INTEGER NOT NULL CHECK (clean BETWEEN 1 AND 5),     -- 깨끗함
+  space       INTEGER NOT NULL CHECK (space BETWEEN 1 AND 5),     -- 자리 여유
+  text        TEXT    NOT NULL DEFAULT '',
+  client      TEXT    NOT NULL,
+  created_at  TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
+);
+CREATE INDEX IF NOT EXISTS idx_reviews_building ON reviews(building_id);

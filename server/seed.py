@@ -201,6 +201,19 @@ CAFETERIAS = [{'id': 'c1', 'name': '백석생활관 식당', 'buildingId': 'dorm
  {'id': 'c3', 'name': '안골식당', 'buildingId': 'global', 'floor': '1층', 'hours': '10:30 ~ 14:00', 'price': ''},
  {'id': 'c4', 'name': '밀겨울', 'buildingId': 'bokji', 'floor': '지하 1층', 'hours': '08:30 ~ 17:00', 'price': ''}]
 
+# 학사·동아리·축제 일정 (web/js/data.js 의 EVENTS 와 같은 내용. 운영 중에는 관리자 API 로 수정)
+EVENTS = [
+    {"cat": "academic", "start": "2026-11-01", "title": "개교기념일"},
+    {"cat": "academic", "start": "2026-11-09", "end": "2026-12-04", "title": "2027학년도 1학기 전공변경·전부(과) 신청"},
+    {"cat": "academic", "start": "2026-11-23", "title": "수업일수 4분의 3"},
+    {"cat": "academic", "start": "2026-11-23", "end": "2026-11-27", "title": "동계 계절학기 수강신청", "due": "신청 마감"},
+    {"cat": "festival", "end": "2026-11-28", "title": "겨울 축제 공연팀 오디션", "due": "접수 마감"},
+    {"cat": "event", "end": "2026-11-29", "title": "교내 해커톤 참가 접수", "due": "접수 마감"},
+    {"cat": "club", "end": "2026-11-30", "title": "동아리 박람회 사전 신청", "due": "신청 마감"},
+    {"cat": "club", "start": "2026-11-30", "title": "동아리 박람회", "place": "학생회관 앞 광장 · 10:00"},
+    {"cat": "festival", "start": "2026-12-03", "title": "겨울 축제 라인업 공개", "place": "공식 계정에서 발표"},
+]
+
 LOST_ITEMS = [('found', '파란색 텀블러', 'library', '3층 열람실', '', '도서관 안내데스크'), ('lost', '학생증', 'jihye', '2층 편의점 근처', '이름 김OO', '오픈채팅')]
 
 
@@ -224,6 +237,10 @@ def seed(conn):
     conn.executemany(
         "INSERT INTO lost_items (type, title, building_id, place, description, contact) VALUES (?,?,?,?,?,?)",
         LOST_ITEMS)
+
+    conn.executemany(
+        "INSERT INTO events (cat, title, start_date, end_date, due, place) VALUES (?,?,?,?,?,?)",
+        [(e["cat"], e["title"], e.get("start"), e.get("end"), e.get("due", ""), e.get("place", "")) for e in EVENTS])
 
     username = os.environ.get("ADMIN_USERNAME", "admin")
     password = os.environ.get("ADMIN_PASSWORD", "admin1234")

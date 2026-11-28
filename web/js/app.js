@@ -85,7 +85,12 @@
     const [buildings, cafes, lost, reports] = await Promise.all([
       Api.get("/api/buildings"), Api.get("/api/cafeterias"), Api.get("/api/lost"), Api.get("/api/reports"),
     ]);
-    replaceAll(BUILDINGS, buildings);
+    // 혼잡도·평가는 서버(DB) 값을 씀. 고장 신고(issues)는 아직 DB 에 없는 예시값이라 data.js 값을 이어 붙임
+    const issues = Object.fromEntries(BUILDINGS.filter((b) => b.issues).map((b) => [b.id, b.issues]));
+    replaceAll(BUILDINGS, buildings.map((b) => (issues[b.id] ? { issues: issues[b.id], ...b } : b)));
+    // 일정: 서버에 없으면(예전 서버) data.js 값 유지
+    const events = await Api.get("/api/events").catch(() => null);
+    if (events) replaceAll(EVENTS, events);
     replaceAll(CAFETERIAS, cafes.map((c) => ({ ...c, weeklyMenu: {} })));
     state.lostItems = lost;
     state.reports = reports;
@@ -851,7 +856,7 @@
     let inner = "";
     if (state.pageTab === "home") {
       const reports = state.reports.filter((r) => r.buildingId === b.id).slice().reverse();
-      inner = `${b.crowd ? `<ul class="facts flat"><li><span class="live warm">지금 ${esc(b.crowd.label)}</span><span class="quiet">${b.crowd.minutesAgo}분 전, ${b.crowd.confirms}명이 확인</span></li></ul>
+      inner = `${b.crowd ? `<ul class="facts flat"><li><span class="live warm">지금 ${esc(b.crowd.label)}</span><span class="quiet">${b.crowd.minutesAgo ? `${b.crowd.minutesAgo}분 전` : "방금"}, ${b.crowd.confirms}명이 확인</span></li></ul>
           <div class="acts small"><button class="btn" data-act="crowd" data-v="yes">맞아요</button><button class="btn" data-act="crowd" data-v="no">아니에요, 한산해요</button></div>`
         : `<div class="acts small"><button class="btn" data-act="crowd" data-v="busy">지금 붐벼요</button><button class="btn" data-act="crowd" data-v="calm">지금 한산해요</button></div>`}
         <p class="sub">층마다 있는 것</p>
@@ -873,9 +878,11 @@
       inner = dayMealChips() + cafes.map((c) => cafeBlock(c, true)).join("");
     } else if (state.pageTab === "rating") {
       const r = b.rating;
-      inner = r ? `<div class="score"><b>${r.score.toFixed(1)}</b><ul>${r.parts.map(([k, v]) => `<li><span>${esc(k)}</span><b>${v.toFixed(1)}</b></li>`).join("")}</ul></div>
+      inner = (r ? `<div class="score"><b>${r.score.toFixed(1)}</b><ul>${r.parts.map(([k, v]) => `<li><span>${esc(k)}</span><b>${v.toFixed(1)}</b></li>`).join("")}</ul></div>
+          ${r.count ? `<p class="quiet">평가 ${r.count}개</p>` : ""}
           <ul class="rows">${r.reviews.map(([when, text]) => `<li class="row"><div><small>${esc(when)}</small><p>${esc(text)}</p></div></li>`).join("")}</ul>`
-        : `<div class="empty">아직 평가가 없어요</div>`;
+        : `<div class="empty">아직 평가가 없어요</div>`)
+        + `<div class="acts small"><button class="btn" data-act="review-add" data-id="${esc(b.id)}">평가 남기기</button></div>`;
     } else if (state.pageTab === "lost") {
       inner = `${losts.length ? `<ul class="rows">${losts.map(lostRow).join("")}</ul>` : `<div class="empty">이 건물에 올라온 분실물이 없어요</div>`}
         <div class="acts small"><button class="btn" data-act="lost-add" data-id="${esc(b.id)}">분실물 올리기</button></div>`;
@@ -1054,7 +1061,8 @@
         Local.save("votes", state.votes);
         return renderSheet();
       }
-      case "crowd": return toast("알려줘서 고마워요. 다른 학생들한테 같이 보여요");
+      case "crowd": return sendCrowd(cur, d.v);
+      case "review-add": return openReview(d.id || cur?.id);
     }
   });
   $("#fixReport").addEventListener("click", () => openReport(state.view.id));
@@ -1166,6 +1174,47 @@
           Local.save("reports", state.reports);
         }
         toast("제보를 보냈어요. 운영자가 확인하면 반영돼요");
+      } catch (e) { alert(e.message); }
+      renderSheet();
+    }
+    form.reset();
+  });
+
+  /* -------------------- 혼잡도 · 평가 (서버: POST /api/buildings/:id/crowd, /reviews) -------------------- */
+  async function sendCrowd(b, v) {
+    if (!b) return;
+    // 버튼 값: busy/calm 은 그대로, yes(맞아요)/no(아니에요, 한산해요)는 지금 표시된 상태 기준
+    const level = v === "yes" ? (b.crowd?.level || "busy") : v === "no" ? "calm" : v;
+    if (!Api.online) return toast("서버에 연결되면 다른 학생들한테 같이 보여요");
+    try {
+      const res = await Api.post(`/api/buildings/${encodeURIComponent(b.id)}/crowd`, { level });
+      if (res.crowd) b.crowd = res.crowd; else delete b.crowd;
+      toast("알려줘서 고마워요. 다른 학생들한테 같이 보여요");
+      renderSheet();
+    } catch (e) { toast(e.message); }
+  }
+
+  function openReview(buildingId) {
+    if (!buildingId) return;
+    if (!Api.online) return toast("서버에 연결되면 평가를 남길 수 있어요");
+    const form = $("#reviewForm");
+    form.buildingId.value = buildingId;
+    $("#reviewTitle").textContent = `${buildingById(buildingId)?.name || ""} 평가`;
+    $("#reviewModal").returnValue = "";
+    $("#reviewModal").showModal();
+  }
+  $("#reviewModal").addEventListener("close", async () => {
+    const form = $("#reviewForm");
+    if ($("#reviewModal").returnValue === "ok") {
+      const f = Object.fromEntries(new FormData(form));
+      const b = buildingById(f.buildingId);
+      try {
+        const res = await Api.post(`/api/buildings/${encodeURIComponent(f.buildingId)}/reviews`, {
+          scores: { facility: Number(f.facility), clean: Number(f.clean), space: Number(f.space) },
+          text: f.text,
+        });
+        if (b) b.rating = res.rating;
+        toast("평가를 남겼어요. 고마워요");
       } catch (e) { alert(e.message); }
       renderSheet();
     }

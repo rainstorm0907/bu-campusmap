@@ -156,6 +156,28 @@
     </form>
   </dialog>
 
+  <!-- 모달: 건물 평가 -->
+  <dialog id="reviewModal">
+    <form method="dialog" id="reviewForm">
+      <h2 tabindex="-1" autofocus id="reviewTitle">건물 평가</h2>
+      <input type="hidden" name="buildingId" />
+      <label>시설 상태 <select name="facility" required>
+        <option value="">선택</option><option value="5">5 아주 좋아요</option><option value="4">4 좋아요</option><option value="3">3 보통이에요</option><option value="2">2 별로예요</option><option value="1">1 나빠요</option>
+      </select></label>
+      <label>깨끗함 <select name="clean" required>
+        <option value="">선택</option><option value="5">5 아주 좋아요</option><option value="4">4 좋아요</option><option value="3">3 보통이에요</option><option value="2">2 별로예요</option><option value="1">1 나빠요</option>
+      </select></label>
+      <label>자리 여유 <select name="space" required>
+        <option value="">선택</option><option value="5">5 아주 넉넉해요</option><option value="4">4 넉넉해요</option><option value="3">3 보통이에요</option><option value="2">2 부족해요</option><option value="1">1 자리가 없어요</option>
+      </select></label>
+      <label>한줄평 (선택) <textarea name="text" rows="3" maxlength="300" placeholder="예: 2층 라운지에 콘센트가 많아서 좋아요"></textarea></label>
+      <div class="modal-actions">
+        <button value="cancel" formnovalidate>취소</button>
+        <button value="ok" class="primary-btn">남기기</button>
+      </div>
+    </form>
+  </dialog>
+
   <script src="js/data.js"></script>
   <script src="js/utils.js"></script>
   <script src="js/api.js"></script>
