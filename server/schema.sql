@@ -154,3 +154,17 @@ CREATE TABLE IF NOT EXISTS reviews (
   created_at  TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 CREATE INDEX IF NOT EXISTS idx_reviews_building ON reviews(building_id);
+
+-- 학식 메뉴 좋아요 / 별로예요. 한 사람이 메뉴 하나에 한 표 (같은 걸 다시 누르면 취소, 반대를 누르면 바뀜)
+CREATE TABLE IF NOT EXISTS menu_votes (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  cafeteria_id TEXT NOT NULL REFERENCES cafeterias(id) ON DELETE CASCADE,
+  date         TEXT NOT NULL,               -- YYYY-MM-DD
+  meal         TEXT NOT NULL CHECK (meal IN ('breakfast', 'lunch', 'dinner')),
+  item         TEXT NOT NULL,               -- 메뉴 이름 (menus.items 안의 값)
+  vote         TEXT NOT NULL CHECK (vote IN ('up', 'down')),
+  client       TEXT NOT NULL,               -- 누른 사람 구분값 (crowd_votes 와 같음)
+  created_at   TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+  UNIQUE (cafeteria_id, date, meal, item, client)
+);
+CREATE INDEX IF NOT EXISTS idx_menu_votes_date ON menu_votes(date);

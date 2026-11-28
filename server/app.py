@@ -560,6 +560,43 @@ def delete_review(rid):
     return jsonify(ok=True)
 
 
+menu_vote_limiter = RateLimiter(per_ip=(60, 60), total=(20000, 86400))
+
+
+@app.get("/api/menu-votes")
+def list_menu_votes():
+    """?from=YYYY-MM-DD&to=YYYY-MM-DD (없으면 오늘). 표가 하나라도 있는 메뉴만 옴"""
+    today = date.today().isoformat()
+    start = valid_date(request.args.get("from", today), "from")
+    end = valid_date(request.args.get("to", start), "to")
+    return jsonify(feedback.menu_votes(get_db(), client_key(), start, end))
+
+
+@app.post("/api/menu-votes")
+def vote_menu():
+    """본문: { cafeteriaId, date, meal, item, vote: "up" | "down" | null } → 그 메뉴의 { up, down, mine, ... }
+    vote 가 null 이면 내 표 취소"""
+    data = body()
+    day = valid_date(data.get("date"))
+    meal = choice(data, "meal", ("breakfast", "lunch", "dinner"))
+    item = text(data, "item", True, 100)
+    cid = data.get("cafeteriaId")
+    vote = None if data.get("vote") is None else choice(data, "vote", ("up", "down"))
+    db = get_db()
+    row = db.execute("SELECT items FROM menus WHERE cafeteria_id = ? AND date = ? AND meal = ?",
+                     (cid, day, meal)).fetchone()
+    if not row or item not in json.loads(row["items"] or "[]"):
+        raise ApiError("그날 메뉴에 없는 음식이에요.", 404)
+    blocked = limited(menu_vote_limiter)
+    if blocked:
+        return blocked
+    feedback.set_menu_vote(db, cid, day, meal, item, vote, client_key())
+    db.commit()
+    found = feedback.menu_votes(db, client_key(), day, day, (cid, meal, item))
+    return jsonify(found[0] if found else
+                   {"cafeteriaId": cid, "date": day, "meal": meal, "item": item, "up": 0, "down": 0, "mine": None})
+
+
 # ================================================================
 #  분실물
 # ================================================================

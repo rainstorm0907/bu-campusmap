@@ -60,6 +60,7 @@ erDiagram
   users ||--o{ reports : reviews
   buildings ||--o{ crowd_votes : votes
   buildings ||--o{ reviews : rated
+  cafeterias ||--o{ menu_votes : voted
 
   buildings { text id PK; text name; text aliases; real lat; real lng; text type; int levels_above; int levels_below; int elevator; text image_url }
   floors { int id PK; text building_id FK; text floor; text note; text places; int sort_order }
@@ -74,6 +75,7 @@ erDiagram
   events { int id PK; text cat; text title; text start_date; text end_date; text due; text place }
   crowd_votes { int id PK; text building_id FK; text level; text client; text created_at }
   reviews { int id PK; text building_id FK; int facility; int clean; int space; text text; text client; text created_at }
+  menu_votes { int id PK; text cafeteria_id FK; text date; text meal; text item; text vote; text client; text created_at }
 ```
 
 설계 포인트:
@@ -82,7 +84,7 @@ erDiagram
 - **층별 시설은 다대다 구조예요** (`floors` ↔ `floor_facilities` ↔ `facility_types`). 카테고리 필터와 "프린터 어디?" 같은 챗봇 질문을 SQL 한 번으로 처리할 수 있어요.
 - **제보 상태값**: `pending`(검토 대기) → `done`(반영 완료) / `rejected`(반려). 2번의 승인 화면에서 바꿔요.
 - `chat_logs`: 4번이 자주 나오는 질문을 분석할 때 쓰도록 남겨둔 기록이에요.
-- **혼잡도와 평가는 누른 기록을 그대로 저장해요** (`crowd_votes`, `reviews`). 평균이나 "몇 명이 확인" 같은 값은 요청이 올 때마다 계산해요. 그래서 관리자가 평가 하나를 지우면 평균도 바로 바뀌어요.
+- **혼잡도, 평가, 메뉴 좋아요는 누른 기록을 그대로 저장해요** (`crowd_votes`, `reviews`, `menu_votes`). 평균이나 "몇 명이 확인" 같은 값은 요청이 올 때마다 계산해요. 그래서 관리자가 평가 하나를 지우면 평균도 바로 바뀌어요.
 
 ## 4. API 명세
 
@@ -147,7 +149,7 @@ erDiagram
   place: "학생회관 앞 광장 · 10:00" }
 ```
 
-### 혼잡도 · 평가 (학생 참여)
+### 혼잡도 · 평가 · 메뉴 좋아요 (학생 참여)
 
 학생은 로그인 없이 누르고 쓸 수 있어요. 관리자는 초기화와 삭제만 해요.
 결과는 `GET /api/buildings`의 각 건물 안에 `crowd`, `rating`으로도 같이 와요. 없으면 키가 빠져요.
@@ -160,6 +162,8 @@ erDiagram
 | POST | `/api/buildings/:id/reviews` | `{scores: {facility, clean, space}, text?}` → `{review, rating}` |
 | GET 🔒 | `/api/reviews?buildingId=` | 관리자 화면용 전체 평가 목록 → `[review]` |
 | DELETE 🔒 | `/api/reviews/:id` | 부적절한 평가 삭제 → `{ok}` |
+| GET | `/api/menu-votes?from=YYYY-MM-DD&to=YYYY-MM-DD` | 그 기간 메뉴별 좋아요/별로예요 수 → `[menuVote]` (표가 있는 메뉴만) |
+| POST | `/api/menu-votes` | `{cafeteriaId, date, meal, item, vote: "up" \| "down" \| null}` → `menuVote` (`null`이면 내 표 취소) |
 
 주고받는 데이터:
 
@@ -180,11 +184,17 @@ erDiagram
 { id: 3, buildingId: "jihye",
   scores: { facility: 4, clean: 5, space: 2 },   // 각각 1~5 정수
   text: "콘센트가 많아요", date: "2026-11-28", when: "2026학년도 2학기, 오늘" }
+
+// menuVote: 메뉴 하나의 좋아요/별로예요
+{ cafeteriaId: "c1", date: "2026-11-30", meal: "lunch", item: "제육볶음",
+  up: 12, down: 3,
+  mine: "up" }               // 요청한 사람이 누른 것. 안 눌렀으면 null
 ```
 
 규칙:
 - **혼잡도**: 같은 사람이 같은 건물에서 10분 안에 다시 누르면 새로 세지 않고 이전 표를 바꿔요. 숫자를 부풀릴 수 없어요.
 - **평가**: 한 사람당 1시간에 5개까지 쓸 수 있어요. 넘으면 `429`가 와요.
+- **메뉴 좋아요**: 한 사람이 메뉴 하나에 한 표예요. 같은 버튼을 다시 누르면 취소, 반대 버튼을 누르면 바뀌어요. 그날 메뉴에 없는 음식은 `404`예요.
 - 사람 구분은 IP를 암호화한 값으로만 하고, 원래 IP는 저장하지 않아요.
 - 고장 신고(`issues`)는 아직 DB에 없어서 화면이 `data.js`의 예시값을 써요.
 
@@ -250,4 +260,4 @@ const { url } = await (await fetch(base + "/api/uploads", { method: "POST", body
 | 2번 데이터·관리자 | `auth/login`, `PUT menus`, `POST/PUT buildings`, `GET/PATCH reports`, `PATCH/DELETE lost`, `events` 추가/수정/삭제, `GET/DELETE reviews`, `DELETE buildings/:id/crowd` |
 | 3번 지도 | `GET buildings`, `GET facility-types` |
 | 4번 챗봇 | `POST chat`, `chatbot.py` 교체 (DB 직접 조회 가능) |
-| 5번 상세·제보 | `GET buildings/:id`, `GET menus`, `GET/POST lost`, `POST reports`, `POST uploads` |
+| 5번 상세·제보 | `GET buildings/:id`, `GET menus`, `GET/POST menu-votes`, `GET/POST lost`, `POST reports`, `POST uploads` |

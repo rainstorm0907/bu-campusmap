@@ -58,7 +58,8 @@
     calDay: null,     // 달력에서 누른 날 (YYYY-MM-DD)
     pageTab: "home",
     floorIdx: 0,
-    votes: {},
+    votes: {},        // 서버가 없을 때: 메뉴 좋아요/별로예요를 이 폰에만 저장
+    menuVotes: {},    // 서버가 있을 때: "식당|날짜|끼니|메뉴" → { up, down, mine }
   };
 
   /** 이번 주 월요일 (토/일이면 다음 주 월요일) */
@@ -113,6 +114,14 @@
       const day = new Date(y, mo - 1, d).getDay();
       (cafe.weeklyMenu[day] ||= {})[m.meal] = m.items;
     });
+    await loadMenuVotes(ymd(state.weekStart), ymd(fri));
+  }
+
+  /** 메뉴 좋아요/별로예요 개수 (서버: GET /api/menu-votes) */
+  const menuVoteKey = (cafeId, ds, meal, item) => `${cafeId}|${ds}|${meal}|${item}`;
+  async function loadMenuVotes(from, to) {
+    const votes = await Api.get(`/api/menu-votes?from=${from}&to=${to}`).catch(() => []);
+    votes.forEach((v) => (state.menuVotes[menuVoteKey(v.cafeteriaId, v.date, v.meal, v.item)] = v));
   }
 
   /** 메뉴 최신화: 관리자가 수정했거나 날짜가 바뀌었으면 다시 그림 */
@@ -363,6 +372,7 @@
       const menus = await Api.get(`/api/menus?from=${key}&to=${ymd(fri)}`);
       for (let d = new Date(mon); d <= fri; d.setDate(d.getDate() + 1)) state.menuCache[ymd(d)] ||= {};
       menus.forEach((m) => ((state.menuCache[m.date][m.cafeteriaId] ||= {})[m.meal] = m.items));
+      await loadMenuVotes(key, ymd(fri));
     } catch {
       for (let d = new Date(mon); d <= fri; d.setDate(d.getDate() + 1)) state.menuCache[ymd(d)] ||= {};
     }
@@ -428,11 +438,12 @@
       ? `<li class="menu quiet">메뉴를 불러오는 중이에요</li>`
       : menu.length
       ? menu.map((m) => {
-          const key = `${c.id}|${state.cafeDate}|${state.meal}|${m}`;
-          const v = state.votes[key];
+          const key = menuVoteKey(c.id, state.cafeDate, state.meal, m);
+          const s = Api.online ? state.menuVotes[key] || {} : { mine: state.votes[key] };
+          const v = s.mine;
           return `<li class="menu"><span>${esc(m)}</span>${withVotes ? `<span class="vote">
-            <button data-act="vote" data-k="${esc(key)}" data-v="up" class="${v === "up" ? "on up" : ""}">좋아요</button>
-            <button data-act="vote" data-k="${esc(key)}" data-v="down" class="${v === "down" ? "on" : ""}">별로예요</button></span>` : ""}</li>`;
+            <button data-act="vote" data-k="${esc(key)}" data-v="up" class="${v === "up" ? "on up" : ""}">좋아요${s.up ? ` ${s.up}` : ""}</button>
+            <button data-act="vote" data-k="${esc(key)}" data-v="down" class="${v === "down" ? "on" : ""}">별로예요${s.down ? ` ${s.down}` : ""}</button></span>` : ""}</li>`;
         }).join("")
       : `<li class="menu quiet">${isWeekend(state.cafeDate) ? "주말은 운영하지 않아요" : "등록된 메뉴가 없어요"}</li>`;
     return `<div class="cafe">
@@ -1057,6 +1068,7 @@
       case "report": return openReport(d.id || cur?.id, { floor: d.floor, kind: d.kind });
       case "ask-chat": return openChat(state.query);
       case "vote": {
+        if (Api.online) return sendMenuVote(d.k, d.v);
         state.votes[d.k] = state.votes[d.k] === d.v ? undefined : d.v;
         Local.save("votes", state.votes);
         return renderSheet();
@@ -1181,6 +1193,16 @@
   });
 
   /* -------------------- 혼잡도 · 평가 (서버: POST /api/buildings/:id/crowd, /reviews) -------------------- */
+  /** 학식 메뉴 좋아요/별로예요. 같은 버튼을 다시 누르면 취소 */
+  async function sendMenuVote(key, v) {
+    const [cafeteriaId, date, meal, ...rest] = key.split("|");
+    const vote = state.menuVotes[key]?.mine === v ? null : v;
+    try {
+      state.menuVotes[key] = await Api.post("/api/menu-votes", { cafeteriaId, date, meal, item: rest.join("|"), vote });
+      renderSheet();
+    } catch (e) { toast(e.message); }
+  }
+
   async function sendCrowd(b, v) {
     if (!b) return;
     // 버튼 값: busy/calm 은 그대로, yes(맞아요)/no(아니에요, 한산해요)는 지금 표시된 상태 기준

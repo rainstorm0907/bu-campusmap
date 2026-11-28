@@ -1,5 +1,5 @@
 """
-학생 참여 데이터: 혼잡도 · 평가
+학생 참여 데이터: 혼잡도 · 평가 · 학식 메뉴 좋아요
 
 화면이 원래 쓰던 모양 그대로 만들어 준다 (web/js/app.js 의 b.crowd, b.rating).
 
@@ -7,6 +7,8 @@
     rating = {"score": 4.1, "count": 12,
               "parts": [["시설 상태", 4.2], ["깨끗함", 4.3], ["자리 여유", 2.6]],
               "reviews": [["2026학년도 2학기, 3일 전", "콘센트가 많아요"], ...]}
+    menu vote = {"cafeteriaId": "c1", "date": "2026-11-30", "meal": "lunch", "item": "제육볶음",
+                 "up": 12, "down": 3, "mine": "up"}   # mine: 요청한 사람이 누른 것 (없으면 null)
 """
 from datetime import datetime
 
@@ -119,3 +121,34 @@ def rating_summary(conn, building_id):
         "parts": parts,
         "reviews": [[when_label(r["created_at"]), r["text"]] for r in texts],
     }
+
+
+# ---------------------------------------------------------------- 학식 메뉴 좋아요
+
+def set_menu_vote(conn, cafeteria_id, day, meal, item, vote, client):
+    """vote 가 None 이면 그 사람 표를 지운다 (같은 버튼을 다시 눌러 취소)"""
+    key = (cafeteria_id, day, meal, item, client)
+    if vote is None:
+        conn.execute("DELETE FROM menu_votes WHERE cafeteria_id = ? AND date = ? AND meal = ? AND item = ? AND client = ?",
+                     key)
+    else:
+        conn.execute(
+            """INSERT INTO menu_votes (cafeteria_id, date, meal, item, client, vote) VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT (cafeteria_id, date, meal, item, client)
+               DO UPDATE SET vote = excluded.vote, created_at = datetime('now', 'localtime')""",
+            (*key, vote))
+
+
+def menu_votes(conn, client, start, end, only=None):
+    """start~end 날짜에 표가 있는 메뉴별 개수. only=(cafeteria_id, meal, item) 이면 그 메뉴 하나만"""
+    sql = """SELECT cafeteria_id, date, meal, item,
+                    SUM(vote = 'up') AS up, SUM(vote = 'down') AS down,
+                    MAX(CASE WHEN client = ? THEN vote END) AS mine
+             FROM menu_votes WHERE date BETWEEN ? AND ?"""
+    args = [client, start, end]
+    if only:
+        sql += " AND cafeteria_id = ? AND meal = ? AND item = ?"
+        args += list(only)
+    rows = conn.execute(sql + " GROUP BY cafeteria_id, date, meal, item", args).fetchall()
+    return [{"cafeteriaId": r["cafeteria_id"], "date": r["date"], "meal": r["meal"], "item": r["item"],
+             "up": r["up"], "down": r["down"], "mine": r["mine"]} for r in rows]
